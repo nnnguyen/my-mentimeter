@@ -1,0 +1,23 @@
+{
+  "name": "my-mentimeter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Realtime word cloud app (Mentimeter-style)",
+  "license": "ISC",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev -w frontend",
+    "dev:backend": "npm run start:dev -w backend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "lint": "npm run lint -w backend && npm run lint -w frontend",
+    "format": "prettier --write .",
+    "db:migrate": "npm run prisma:migrate -w backend",
+    "db:generate": "npm run prisma:generate -w backend"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  }
+}
