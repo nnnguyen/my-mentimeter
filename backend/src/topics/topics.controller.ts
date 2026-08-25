@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { TopicsService } from './topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
+import { SetCurrentQuestionDto } from './dto/set-current-question.dto';
 
 @Controller('topics')
 @UseGuards(JwtAuthGuard)
@@ -53,8 +54,12 @@ export class TopicsController {
     res.send(png);
   }
 
-  @Get(':id/wordcloud')
-  getWordCloud(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.topicsService.getWordCloud(id, user.id);
+  @Post(':id/current-question')
+  setCurrentQuestion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SetCurrentQuestionDto,
+  ) {
+    return this.topicsService.setCurrentQuestion(id, user.id, dto.questionId);
   }
 }

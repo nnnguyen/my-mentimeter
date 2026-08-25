@@ -9,10 +9,12 @@ import {
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Server, Socket } from 'socket.io';
+import { Question } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth.constants';
 import type { AuthenticatedUser, JwtPayload } from '../auth/strategies/jwt.strategy';
-import { TopicsService } from '../topics/topics.service';
 import { WordCloudService } from '../word-cloud/word-cloud.service';
+import { AudienceGateway } from './audience.gateway';
 import { parseCookieHeader } from './parse-cookie-header';
 
 interface PresenterSocketData {
@@ -20,6 +22,28 @@ interface PresenterSocketData {
 }
 
 type PresenterSocket = Socket<any, any, any, PresenterSocketData>;
+
+interface QuestionChangedPayload {
+  questionId: string;
+  order: number;
+  prompt: string;
+  status: string;
+  config: {
+    type: string;
+    responseLimit: number | null;
+    maxWordLength: number;
+    allowDuplicateFromSameUser: boolean;
+    backgroundColor: string;
+    textColorScheme: string;
+    showLogo: boolean;
+    maxWordsDisplayed: number;
+    showJoiningInfo: boolean;
+    joiningInfoType: string;
+    resultVisibility: string;
+    resultsRevealed: boolean;
+    showResultsToAudience: boolean;
+  };
+}
 
 @WebSocketGateway({
   namespace: '/presenter',
@@ -33,8 +57,9 @@ export class WordCloudGateway implements OnGatewayConnection {
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly topicsService: TopicsService,
+    private readonly prisma: PrismaService,
     private readonly wordCloudService: WordCloudService,
+    private readonly audienceGateway: AudienceGateway,
   ) {}
 
   handleConnection(client: PresenterSocket) {
@@ -63,9 +88,8 @@ export class WordCloudGateway implements OnGatewayConnection {
       client.disconnect();
       return { ok: false, message: 'Unauthenticated.' };
     }
-    try {
-      await this.topicsService.findOneForUser(body.topicId, user.id);
-    } catch {
+    const topic = await this.prisma.topic.findUnique({ where: { id: body.topicId } });
+    if (!topic || topic.ownerId !== user.id) {
       const message = 'Bạn không có quyền truy cập topic này.';
       client.emit('join:error', { message });
       return { ok: false, message };
@@ -74,9 +98,67 @@ export class WordCloudGateway implements OnGatewayConnection {
     return { ok: true };
   }
 
-  async broadcastSnapshot(topicId: string): Promise<void> {
-    const snapshot = await this.wordCloudService.getSnapshot(topicId);
-    this.server.to(`topic:${topicId}`).emit('wordcloud:update', snapshot);
-    this.logger.debug(`Broadcast wordcloud:update to topic:${topicId}`);
+  private isResultHidden(
+    question: Pick<Question, 'resultVisibility' | 'resultsRevealed'> | null,
+  ): boolean {
+    if (!question) {
+      return false;
+    }
+    if (question.resultVisibility === 'PRIVATE') {
+      return true;
+    }
+    return question.resultVisibility === 'ON_CLICK' && !question.resultsRevealed;
+  }
+
+  async broadcastSnapshot(topicId: string, questionId: string): Promise<void> {
+    const [snapshot, question] = await Promise.all([
+      this.wordCloudService.getSnapshot(questionId),
+      this.prisma.question.findUnique({ where: { id: questionId } }),
+    ]);
+
+    const payload = this.isResultHidden(question)
+      ? { totalResponses: snapshot.totalResponses, questionId }
+      : { ...snapshot, questionId };
+
+    this.server.to(`topic:${topicId}`).emit('wordcloud:update', payload);
+    this.audienceGateway.server.to(`topic:${topicId}`).emit('wordcloud:update', payload);
+    this.logger.debug(`Broadcast wordcloud:update to topic:${topicId} for question:${questionId}`);
+  }
+
+  async broadcastResultsRevealed(topicId: string, questionId: string): Promise<void> {
+    const snapshot = await this.wordCloudService.getSnapshot(questionId);
+    const payload = { ...snapshot, questionId };
+
+    this.server.to(`topic:${topicId}`).emit('results:revealed', payload);
+    this.audienceGateway.server.to(`topic:${topicId}`).emit('results:revealed', payload);
+    this.logger.debug(`Broadcast results:revealed to topic:${topicId} for question:${questionId}`);
+  }
+
+  broadcastQuestionChanged(topicId: string, question: Question): void {
+    const payload: QuestionChangedPayload = {
+      questionId: question.id,
+      order: question.order,
+      prompt: question.prompt,
+      status: question.status,
+      config: {
+        type: question.type,
+        responseLimit: question.responseLimit,
+        maxWordLength: question.maxWordLength,
+        allowDuplicateFromSameUser: question.allowDuplicateFromSameUser,
+        backgroundColor: question.backgroundColor,
+        textColorScheme: question.textColorScheme,
+        showLogo: question.showLogo,
+        maxWordsDisplayed: question.maxWordsDisplayed,
+        showJoiningInfo: question.showJoiningInfo,
+        joiningInfoType: question.joiningInfoType,
+        resultVisibility: question.resultVisibility,
+        resultsRevealed: question.resultsRevealed,
+        showResultsToAudience: question.showResultsToAudience,
+      },
+    };
+
+    this.server.to(`topic:${topicId}`).emit('question:changed', payload);
+    this.audienceGateway.server.to(`topic:${topicId}`).emit('question:changed', payload);
+    this.logger.debug(`Broadcast question:changed to topic:${topicId} for question:${question.id}`);
   }
 }

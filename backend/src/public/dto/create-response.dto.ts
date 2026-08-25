@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
 export class CreateResponseDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(40)
+  @MaxLength(500)
   text: string;
 
   @IsString()

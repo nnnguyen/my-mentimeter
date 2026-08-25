@@ -16,14 +16,14 @@ export interface WordCloudSnapshot {
 export class WordCloudService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSnapshot(topicId: string): Promise<WordCloudSnapshot> {
+  async getSnapshot(questionId: string): Promise<WordCloudSnapshot> {
     const [words, totalResponses] = await Promise.all([
       this.prisma.wordAggregate.findMany({
-        where: { topicId },
+        where: { questionId },
         orderBy: { count: 'desc' },
         select: { displayText: true, count: true },
       }),
-      this.prisma.response.count({ where: { topicId } }),
+      this.prisma.response.count({ where: { questionId } }),
     ]);
 
     return { words, totalResponses, uniqueWords: words.length };

@@ -11,23 +11,65 @@ function fakeSocket(cookie?: string) {
   };
 }
 
+function fakeServer() {
+  const emit = jest.fn();
+  const to = jest.fn().mockReturnValue({ emit });
+  return { to, emit };
+}
+
 describe('WordCloudGateway', () => {
   let jwtService: { verify: jest.Mock };
-  let topicsService: { findOneForUser: jest.Mock };
+  let prisma: { topic: { findUnique: jest.Mock }; question: { findUnique: jest.Mock } };
   let wordCloudService: { getSnapshot: jest.Mock };
+  let presenterServer: ReturnType<typeof fakeServer>;
+  let audienceServer: ReturnType<typeof fakeServer>;
+  let audienceGateway: { server: ReturnType<typeof fakeServer> };
   let gateway: WordCloudGateway;
 
   const user = { id: 'user-1', email: 'a@example.com', name: 'A' };
+  const topic = { id: 'topic-1', ownerId: user.id };
+
+  const question = {
+    id: 'question-1',
+    topicId: 'topic-1',
+    order: 1,
+    prompt: 'Bạn nghĩ gì?',
+    status: 'ACTIVE',
+    type: 'WORD_CLOUD',
+    responseLimit: null,
+    maxWordLength: 40,
+    allowDuplicateFromSameUser: false,
+    backgroundColor: '#FFFFFF',
+    textColorScheme: 'default',
+    showLogo: true,
+    maxWordsDisplayed: 50,
+    showJoiningInfo: true,
+    joiningInfoType: 'QR_CODE',
+    resultVisibility: 'INSTANT',
+    resultsRevealed: false,
+    showResultsToAudience: false,
+  };
+
+  const snapshot = {
+    words: [{ displayText: 'hello', count: 2 }],
+    totalResponses: 2,
+    uniqueWords: 1,
+  };
 
   beforeEach(() => {
     jwtService = { verify: jest.fn() };
-    topicsService = { findOneForUser: jest.fn() };
+    prisma = { topic: { findUnique: jest.fn() }, question: { findUnique: jest.fn() } };
     wordCloudService = { getSnapshot: jest.fn() };
+    presenterServer = fakeServer();
+    audienceServer = fakeServer();
+    audienceGateway = { server: audienceServer };
     gateway = new WordCloudGateway(
       jwtService as never,
-      topicsService as never,
+      prisma as never,
       wordCloudService as never,
+      audienceGateway as never,
     );
+    gateway.server = presenterServer as never;
   });
 
   describe('handleConnection', () => {
@@ -80,11 +122,22 @@ describe('WordCloudGateway', () => {
     it('emits join:error and does not join the room when the user is not the topic owner', async () => {
       const client = fakeSocket();
       client.data.user = user;
-      topicsService.findOneForUser.mockRejectedValue(new Error('forbidden'));
+      prisma.topic.findUnique.mockResolvedValue({ id: 'topic-1', ownerId: 'someone-else' });
 
       await gateway.handleJoin(client as never, { topicId: 'topic-1' });
 
-      expect(topicsService.findOneForUser).toHaveBeenCalledWith('topic-1', user.id);
+      expect(prisma.topic.findUnique).toHaveBeenCalledWith({ where: { id: 'topic-1' } });
+      expect(client.emit).toHaveBeenCalledWith('join:error', expect.any(Object));
+      expect(client.join).not.toHaveBeenCalled();
+    });
+
+    it('emits join:error when the topic does not exist', async () => {
+      const client = fakeSocket();
+      client.data.user = user;
+      prisma.topic.findUnique.mockResolvedValue(null);
+
+      await gateway.handleJoin(client as never, { topicId: 'topic-1' });
+
       expect(client.emit).toHaveBeenCalledWith('join:error', expect.any(Object));
       expect(client.join).not.toHaveBeenCalled();
     });
@@ -92,11 +145,111 @@ describe('WordCloudGateway', () => {
     it('joins the topic room when the user owns the topic', async () => {
       const client = fakeSocket();
       client.data.user = user;
-      topicsService.findOneForUser.mockResolvedValue({ id: 'topic-1', ownerId: user.id });
+      prisma.topic.findUnique.mockResolvedValue(topic);
 
       await gateway.handleJoin(client as never, { topicId: 'topic-1' });
 
       expect(client.join).toHaveBeenCalledWith('topic:topic-1');
+    });
+  });
+
+  describe('broadcastSnapshot', () => {
+    it('sends the full word list to both namespaces when resultVisibility is INSTANT', async () => {
+      wordCloudService.getSnapshot.mockResolvedValue(snapshot);
+      prisma.question.findUnique.mockResolvedValue(question);
+
+      await gateway.broadcastSnapshot('topic-1', question.id);
+
+      const expectedPayload = { ...snapshot, questionId: question.id };
+      expect(presenterServer.to).toHaveBeenCalledWith('topic:topic-1');
+      expect(presenterServer.emit).toHaveBeenCalledWith('wordcloud:update', expectedPayload);
+      expect(audienceServer.to).toHaveBeenCalledWith('topic:topic-1');
+      expect(audienceServer.emit).toHaveBeenCalledWith('wordcloud:update', expectedPayload);
+    });
+
+    it('hides the word list when resultVisibility is PRIVATE', async () => {
+      wordCloudService.getSnapshot.mockResolvedValue(snapshot);
+      prisma.question.findUnique.mockResolvedValue({ ...question, resultVisibility: 'PRIVATE' });
+
+      await gateway.broadcastSnapshot('topic-1', question.id);
+
+      const hiddenPayload = { totalResponses: snapshot.totalResponses, questionId: question.id };
+      expect(presenterServer.emit).toHaveBeenCalledWith('wordcloud:update', hiddenPayload);
+    });
+
+    it('hides the word list when resultVisibility is ON_CLICK and resultsRevealed is false', async () => {
+      wordCloudService.getSnapshot.mockResolvedValue(snapshot);
+      prisma.question.findUnique.mockResolvedValue({
+        ...question,
+        resultVisibility: 'ON_CLICK',
+        resultsRevealed: false,
+      });
+
+      await gateway.broadcastSnapshot('topic-1', question.id);
+
+      expect(presenterServer.emit).toHaveBeenCalledWith('wordcloud:update', {
+        totalResponses: snapshot.totalResponses,
+        questionId: question.id,
+      });
+    });
+
+    it('shows the full word list when resultVisibility is ON_CLICK and resultsRevealed is true', async () => {
+      wordCloudService.getSnapshot.mockResolvedValue(snapshot);
+      prisma.question.findUnique.mockResolvedValue({
+        ...question,
+        resultVisibility: 'ON_CLICK',
+        resultsRevealed: true,
+      });
+
+      await gateway.broadcastSnapshot('topic-1', question.id);
+
+      expect(presenterServer.emit).toHaveBeenCalledWith('wordcloud:update', {
+        ...snapshot,
+        questionId: question.id,
+      });
+    });
+  });
+
+  describe('broadcastResultsRevealed', () => {
+    it('always sends the full snapshot to both namespaces under results:revealed', async () => {
+      wordCloudService.getSnapshot.mockResolvedValue(snapshot);
+
+      await gateway.broadcastResultsRevealed('topic-1', question.id);
+
+      const expectedPayload = { ...snapshot, questionId: question.id };
+      expect(presenterServer.emit).toHaveBeenCalledWith('results:revealed', expectedPayload);
+      expect(audienceServer.emit).toHaveBeenCalledWith('results:revealed', expectedPayload);
+    });
+  });
+
+  describe('broadcastQuestionChanged', () => {
+    it('emits question:changed with the question config to both namespaces', () => {
+      gateway.broadcastQuestionChanged('topic-1', question as never);
+
+      const expectedPayload = {
+        questionId: question.id,
+        order: question.order,
+        prompt: question.prompt,
+        status: question.status,
+        config: {
+          type: question.type,
+          responseLimit: question.responseLimit,
+          maxWordLength: question.maxWordLength,
+          allowDuplicateFromSameUser: question.allowDuplicateFromSameUser,
+          backgroundColor: question.backgroundColor,
+          textColorScheme: question.textColorScheme,
+          showLogo: question.showLogo,
+          maxWordsDisplayed: question.maxWordsDisplayed,
+          showJoiningInfo: question.showJoiningInfo,
+          joiningInfoType: question.joiningInfoType,
+          resultVisibility: question.resultVisibility,
+          resultsRevealed: question.resultsRevealed,
+          showResultsToAudience: question.showResultsToAudience,
+        },
+      };
+
+      expect(presenterServer.emit).toHaveBeenCalledWith('question:changed', expectedPayload);
+      expect(audienceServer.emit).toHaveBeenCalledWith('question:changed', expectedPayload);
     });
   });
 });

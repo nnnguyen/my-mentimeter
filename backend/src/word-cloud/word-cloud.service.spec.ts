@@ -27,14 +27,14 @@ describe('WordCloudService', () => {
     prisma.wordAggregate.findMany.mockResolvedValue(words);
     prisma.response.count.mockResolvedValue(9);
 
-    const result = await service.getSnapshot('topic-1');
+    const result = await service.getSnapshot('question-1');
 
     expect(prisma.wordAggregate.findMany).toHaveBeenCalledWith({
-      where: { topicId: 'topic-1' },
+      where: { questionId: 'question-1' },
       orderBy: { count: 'desc' },
       select: { displayText: true, count: true },
     });
-    expect(prisma.response.count).toHaveBeenCalledWith({ where: { topicId: 'topic-1' } });
+    expect(prisma.response.count).toHaveBeenCalledWith({ where: { questionId: 'question-1' } });
     expect(result).toEqual({ words, totalResponses: 9, uniqueWords: 2 });
   });
 
@@ -42,7 +42,7 @@ describe('WordCloudService', () => {
     prisma.wordAggregate.findMany.mockResolvedValue([]);
     prisma.response.count.mockResolvedValue(0);
 
-    const result = await service.getSnapshot('topic-1');
+    const result = await service.getSnapshot('question-1');
 
     expect(result).toEqual({ words: [], totalResponses: 0, uniqueWords: 0 });
   });
