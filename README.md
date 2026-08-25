@@ -40,7 +40,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 ```
 
-Điền các giá trị thật (Google OAuth client id/secret, JWT secret...) khi làm tới Giai đoạn 1. Không commit các file `.env`/`.env.local`.
+Điền các giá trị thật (xem mục "Thiết lập Google OAuth" bên dưới). Không commit các file `.env`/`.env.local`.
 
 ## Migration database
 
@@ -48,9 +48,23 @@ cp frontend/.env.example frontend/.env.local
 npm run db:migrate
 ```
 
-Chạy `prisma migrate dev` trong `backend`, áp schema ở `backend/prisma/schema.prisma` vào database.
+Chạy `prisma migrate dev` trong `backend`, áp schema ở `backend/prisma/schema.prisma` vào database. Prisma Client generate vào `node_modules/@prisma/client` (generator `prisma-client-js` — chọn generator này thay vì generator `prisma-client` mặc định của Prisma 6 vì generator mới xuất code ESM, không tương thích với backend NestJS đang chạy CommonJS).
 
-Prisma Client được generate ra `backend/generated/prisma` (không phải `node_modules/@prisma/client` như bản cũ) — import từ đường dẫn này khi viết code backend.
+## Thiết lập Google OAuth
+
+Cần làm 1 lần trước khi test đăng nhập:
+
+1. Vào [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → tạo OAuth Client ID, loại **Web application**.
+2. **Authorized redirect URIs**: thêm `http://localhost:3001/api/auth/google/callback`.
+3. Copy Client ID / Client Secret, điền vào `backend/.env`:
+   ```
+   GOOGLE_CLIENT_ID=...
+   GOOGLE_CLIENT_SECRET=...
+   ```
+4. Sinh `JWT_SECRET` ngẫu nhiên (vd `openssl rand -hex 32`) điền vào `backend/.env`.
+5. Restart `npm run dev:backend` sau khi sửa `.env`.
+
+Cho tới khi làm bước này, backend vẫn chạy được bình thường (dùng giá trị placeholder trong `.env`) nhưng nút "Đăng nhập với Google" sẽ báo lỗi từ phía Google vì `client_id` không hợp lệ.
 
 ## Chạy dev
 
