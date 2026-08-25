@@ -80,7 +80,7 @@ model Topic {
   question        String
   code            String      @unique   // mã ngắn trong URL public, vd "AB12CD"
   status          TopicStatus @default(DRAFT)
-  maxWordsPerUser Int         @default(3)
+  maxWordsPerUser Int?        // null = không giới hạn số từ mỗi người; người tạo topic tự chọn có giới hạn hay không
   createdAt       DateTime    @default(now())
   responses       Response[]
   wordAggregates  WordAggregate[]
@@ -142,10 +142,10 @@ Viết hàm này thành 1 util riêng (`normalizeWord`) có unit test đầy đ�
 - `GET    /api/topics/:id/wordcloud` — `{ words: [{displayText, count}] (sort count desc), totalResponses, uniqueWords }`
 
 **Public (không cần đăng nhập)**
-- `GET  /api/public/topics/:code` — trả `{ title, question, status, maxWordsPerUser }`
+- `GET  /api/public/topics/:code` — trả `{ title, question, status, maxWordsPerUser }` (`maxWordsPerUser` có thể là `null` = không giới hạn)
 - `POST /api/public/topics/:code/responses` — body `{ text, participantSessionId }`
   - Chặn nếu topic không ở trạng thái ACTIVE (trả 409)
-  - Chặn nếu `participantSessionId` đã gửi đủ `maxWordsPerUser` từ (trả 429)
+  - Chặn nếu `participantSessionId` đã gửi đủ `maxWordsPerUser` từ (trả 429) — bỏ qua kiểm tra này nếu `maxWordsPerUser` là `null`
   - Rate limit cơ bản theo IP để tránh spam
 
 **WebSocket** — namespace `/presenter`
@@ -168,7 +168,7 @@ Viết hàm này thành 1 util riêng (`normalizeWord`) có unit test đầy đ�
 - [ ] Khán giả gửi từ thành công mà không cần đăng nhập
 - [ ] Word cloud trên `/topics/[id]` cập nhật **trong vòng 1 giây**, không cần F5
 - [ ] Từ giống nhau sau chuẩn hoá được gộp đúng, `count` tăng chính xác (có unit test cho `normalizeWord`)
-- [ ] Giới hạn `maxWordsPerUser` hoạt động trên 1 thiết bị
+- [ ] `maxWordsPerUser` là tuỳ chọn (người tạo topic tự bật/tắt); khi được cấu hình thì giới hạn hoạt động đúng trên 1 thiết bị, khi để trống (`null`) thì không giới hạn
 - [ ] Topic ở trạng thái CLOSED thì không gửi được nữa
 - [ ] Rút dây mạng / tắt backend → frontend tự chuyển polling, kết nối lại thì tự đồng bộ
 - [ ] Người dùng A không xem/sửa được topic của người dùng B

@@ -15,12 +15,12 @@ export interface PublicTopicInfo {
   title: string;
   question: string;
   status: string;
-  maxWordsPerUser: number;
+  maxWordsPerUser: number | null;
 }
 
 export interface CreateResponseResult {
   submittedCount: number;
-  maxWordsPerUser: number;
+  maxWordsPerUser: number | null;
 }
 
 @Injectable()
@@ -55,7 +55,7 @@ export class PublicTopicsService {
     const existingCount = await this.prisma.response.count({
       where: { topicId: topic.id, participantSessionId: dto.participantSessionId },
     });
-    if (existingCount >= topic.maxWordsPerUser) {
+    if (topic.maxWordsPerUser !== null && existingCount >= topic.maxWordsPerUser) {
       throw new HttpException('Bạn đã gửi đủ số từ cho phép.', HttpStatus.TOO_MANY_REQUESTS);
     }
 

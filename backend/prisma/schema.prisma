@@ -34,7 +34,7 @@ model Topic {
   question        String
   code            String          @unique // mã ngắn trong URL public, vd "AB12CD"
   status          TopicStatus     @default(DRAFT)
-  maxWordsPerUser Int             @default(3)
+  maxWordsPerUser Int? // null = không giới hạn số từ mỗi người
   createdAt       DateTime        @default(now())
   responses       Response[]
   wordAggregates  WordAggregate[]

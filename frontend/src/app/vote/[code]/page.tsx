@@ -13,7 +13,7 @@ interface PublicTopic {
   title: string;
   question: string;
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
-  maxWordsPerUser: number;
+  maxWordsPerUser: number | null;
 }
 
 function submittedCountKey(code: string) {
@@ -59,7 +59,7 @@ export default function VotePage() {
       });
 
       if (res.status === 201) {
-        const data: { submittedCount: number; maxWordsPerUser: number } = await res.json();
+        const data: { submittedCount: number; maxWordsPerUser: number | null } = await res.json();
         setSubmittedCount(data.submittedCount);
         localStorage.setItem(submittedCountKey(code), String(data.submittedCount));
         setText('');
@@ -67,7 +67,7 @@ export default function VotePage() {
         setError('Chủ đề chưa mở hoặc đã đóng.');
       } else if (res.status === 429) {
         setError('Bạn đã gửi đủ số từ cho phép.');
-        if (topic) {
+        if (topic?.maxWordsPerUser !== null && topic?.maxWordsPerUser !== undefined) {
           setSubmittedCount(topic.maxWordsPerUser);
           localStorage.setItem(submittedCountKey(code), String(topic.maxWordsPerUser));
         }
@@ -98,7 +98,8 @@ export default function VotePage() {
   }
 
   const isClosed = topic.status !== 'ACTIVE';
-  const quotaReached = submittedCount >= topic.maxWordsPerUser;
+  const maxWordsPerUser = topic.maxWordsPerUser;
+  const quotaReached = maxWordsPerUser !== null && submittedCount >= maxWordsPerUser;
   const disabled = isClosed || quotaReached;
 
   return (
@@ -154,14 +155,20 @@ export default function VotePage() {
           </Button>
 
           <div>
-            <Text type="secondary">
-              Đã gửi {submittedCount}/{topic.maxWordsPerUser} từ
-            </Text>
-            <Progress
-              percent={Math.min(100, (submittedCount / topic.maxWordsPerUser) * 100)}
-              showInfo={false}
-              size="small"
-            />
+            {maxWordsPerUser !== null ? (
+              <>
+                <Text type="secondary">
+                  Đã gửi {submittedCount}/{maxWordsPerUser} từ
+                </Text>
+                <Progress
+                  percent={Math.min(100, (submittedCount / maxWordsPerUser) * 100)}
+                  showInfo={false}
+                  size="small"
+                />
+              </>
+            ) : (
+              <Text type="secondary">Đã gửi {submittedCount} từ</Text>
+            )}
           </div>
         </Space>
       </Card>

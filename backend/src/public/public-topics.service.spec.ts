@@ -136,5 +136,15 @@ describe('PublicTopicsService', () => {
       await service.createResponse('ABC123', { ...dto, text: '!!!' }).catch(() => undefined);
       expect(wordCloudGateway.broadcastSnapshot).not.toHaveBeenCalled();
     });
+
+    it('never blocks on quota when maxWordsPerUser is null (unlimited)', async () => {
+      const unlimitedTopic = { ...activeTopic, maxWordsPerUser: null };
+      prisma.topic.findUnique.mockResolvedValue(unlimitedTopic);
+      prisma.response.count.mockResolvedValue(9999); // way past any normal limit
+
+      const result = await service.createResponse('ABC123', dto);
+
+      expect(result).toEqual({ submittedCount: 10000, maxWordsPerUser: null });
+    });
   });
 });

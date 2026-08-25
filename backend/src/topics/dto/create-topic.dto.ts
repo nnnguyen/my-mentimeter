@@ -11,9 +11,10 @@ export class CreateTopicDto {
   @MaxLength(500)
   question: string;
 
+  // null = không giới hạn số từ mỗi người; @IsOptional() bỏ qua validate khi null/undefined.
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(10)
-  maxWordsPerUser?: number;
+  maxWordsPerUser?: number | null;
 }

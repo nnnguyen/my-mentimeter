@@ -14,6 +14,7 @@ import {
   Popconfirm,
   Space,
   Spin,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -38,7 +39,7 @@ interface Topic {
   question: string;
   code: string;
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
-  maxWordsPerUser: number;
+  maxWordsPerUser: number | null;
   createdAt: string;
 }
 
@@ -60,6 +61,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [limitEnabled, setLimitEnabled] = useState(false);
+  const [wordLimit, setWordLimit] = useState(3);
   const [form] = Form.useForm();
 
   const loadTopics = useCallback(async () => {
@@ -90,19 +93,21 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const handleCreate = async (values: {
-    title: string;
-    question: string;
-    maxWordsPerUser?: number;
-  }) => {
+  const handleCreate = async (values: { title: string; question: string }) => {
     setCreating(true);
     try {
-      const res = await apiFetch('/api/topics', { method: 'POST', body: JSON.stringify(values) });
+      const payload = {
+        ...values,
+        maxWordsPerUser: limitEnabled ? wordLimit : null,
+      };
+      const res = await apiFetch('/api/topics', { method: 'POST', body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('create failed');
       const { id } = await res.json();
       message.success('Tạo topic thành công');
       setModalOpen(false);
       form.resetFields();
+      setLimitEnabled(false);
+      setWordLimit(3);
       router.push(`/topics/${id}`);
     } catch {
       message.error('Tạo topic thất bại');
@@ -217,12 +222,7 @@ export default function DashboardPage() {
         okText="Tạo"
         cancelText="Huỷ"
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleCreate}
-          initialValues={{ maxWordsPerUser: 3 }}
-        >
+        <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Form.Item
             name="title"
             label="Tiêu đề"
@@ -237,12 +237,20 @@ export default function DashboardPage() {
           >
             <Input.TextArea maxLength={500} rows={3} />
           </Form.Item>
-          <Form.Item
-            name="maxWordsPerUser"
-            label="Số từ tối đa mỗi người"
-            rules={[{ required: true }]}
-          >
-            <InputNumber min={1} max={10} style={{ width: '100%' }} />
+          <Form.Item label="Giới hạn số từ mỗi người">
+            <Space>
+              <Switch checked={limitEnabled} onChange={setLimitEnabled} />
+              {limitEnabled ? (
+                <InputNumber
+                  min={1}
+                  max={10}
+                  value={wordLimit}
+                  onChange={(value) => setWordLimit(value ?? 3)}
+                />
+              ) : (
+                <Text type="secondary">Không giới hạn</Text>
+              )}
+            </Space>
           </Form.Item>
         </Form>
       </Modal>

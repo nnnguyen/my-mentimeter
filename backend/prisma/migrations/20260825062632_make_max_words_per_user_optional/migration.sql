@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Topic" ALTER COLUMN "maxWordsPerUser" DROP NOT NULL,
+ALTER COLUMN "maxWordsPerUser" DROP DEFAULT;

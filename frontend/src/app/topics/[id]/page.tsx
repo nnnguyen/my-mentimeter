@@ -16,7 +16,7 @@ interface Topic {
   question: string;
   code: string;
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
-  maxWordsPerUser: number;
+  maxWordsPerUser: number | null;
   createdAt: string;
 }
 
@@ -211,6 +211,12 @@ export default function TopicDetailPage() {
             </Title>
             <Paragraph>{topic.question}</Paragraph>
             <Text type="secondary">Mã: {topic.code}</Text>
+            <br />
+            <Text type="secondary">
+              {topic.maxWordsPerUser !== null
+                ? `Giới hạn: ${topic.maxWordsPerUser} từ/người`
+                : 'Không giới hạn số từ'}
+            </Text>
           </div>
 
           <Space>
