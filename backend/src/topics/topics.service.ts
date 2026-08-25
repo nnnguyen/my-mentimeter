@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -8,7 +9,7 @@ import { randomInt } from 'crypto';
 import * as QRCode from 'qrcode';
 import { Topic } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { WordCloudService, WordCloudSnapshot } from '../word-cloud/word-cloud.service';
+import { WordCloudGateway } from '../realtime/word-cloud.gateway';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 
@@ -20,7 +21,7 @@ const MAX_CODE_ATTEMPTS = 5;
 export class TopicsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly wordCloudService: WordCloudService,
+    private readonly wordCloudGateway: WordCloudGateway,
   ) {}
 
   private async generateUniqueCode(): Promise<string> {
@@ -43,8 +44,7 @@ export class TopicsService {
       data: {
         ownerId,
         title: dto.title,
-        question: dto.question,
-        maxWordsPerUser: dto.maxWordsPerUser,
+        description: dto.description,
         code,
       },
     });
@@ -80,12 +80,43 @@ export class TopicsService {
 
   async generateQrCodePng(id: string, ownerId: string): Promise<Buffer> {
     const topic = await this.findOneForUser(id, ownerId);
-    const voteUrl = `${process.env.FRONTEND_URL}/vote/${topic.code}`;
-    return QRCode.toBuffer(voteUrl, { type: 'png' });
+    const joinUrl = `${process.env.FRONTEND_URL}/join/${topic.code}`;
+    // Default QR generation is tiny (~1-2mm-per-module PNG) — bump the raster
+    // size so it stays crisp when displayed larger on the present screen.
+    return QRCode.toBuffer(joinUrl, { type: 'png', width: 512, margin: 2 });
   }
 
-  async getWordCloud(id: string, ownerId: string): Promise<WordCloudSnapshot> {
-    await this.findOneForUser(id, ownerId);
-    return this.wordCloudService.getSnapshot(id);
+  async setCurrentQuestion(topicId: string, ownerId: string, questionId: string): Promise<Topic> {
+    const existingTopic = await this.findOneForUser(topicId, ownerId);
+    const question = await this.prisma.question.findUnique({ where: { id: questionId } });
+    if (!question || question.topicId !== topicId) {
+      throw new BadRequestException('Câu hỏi không thuộc topic này.');
+    }
+
+    const previousQuestionId = existingTopic.currentQuestionId;
+
+    // Becoming the current question also opens it for responses, and moving
+    // away from the previous one closes it — "current" and "open" are the
+    // same concept from the audience's point of view (mục 3 CLAUDE.md).
+    const [updatedQuestion, topic] = await this.prisma.$transaction(async (tx) => {
+      if (previousQuestionId && previousQuestionId !== questionId) {
+        await tx.question.updateMany({
+          where: { id: previousQuestionId, status: 'ACTIVE' },
+          data: { status: 'CLOSED' },
+        });
+      }
+      const updatedQuestion = await tx.question.update({
+        where: { id: questionId },
+        data: { status: 'ACTIVE' },
+      });
+      const topic = await tx.topic.update({
+        where: { id: topicId },
+        data: { currentQuestionId: questionId },
+      });
+      return [updatedQuestion, topic] as const;
+    });
+
+    this.wordCloudGateway.broadcastQuestionChanged(topicId, updatedQuestion);
+    return topic;
   }
 }

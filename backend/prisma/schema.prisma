@@ -26,42 +26,104 @@ enum TopicStatus {
   CLOSED
 }
 
+enum QuestionStatus {
+  DRAFT // chưa mở, khán giả không thấy
+  ACTIVE // đang nhận câu trả lời
+  CLOSED // đã đóng, chỉ xem kết quả
+}
+
+enum QuestionType {
+  WORD_CLOUD // hiện chỉ hỗ trợ loại này; để enum sẵn cho việc mở rộng sau
+}
+
+enum JoiningInfoType {
+  QR_CODE
+  LINK
+  CODE
+}
+
+enum ResultVisibility {
+  INSTANT // kết quả hiện ngay khi khán giả gửi
+  ON_CLICK // presenter bấm mới hiện — tránh hiệu ứng bầy đàn (khuyến nghị)
+  PRIVATE // không hiện trên màn hình chiếu, chỉ xem/export sau
+}
+
 model Topic {
-  id              String          @id @default(uuid())
-  ownerId         String
-  owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  title           String
-  question        String
-  code            String          @unique // mã ngắn trong URL public, vd "AB12CD"
-  status          TopicStatus     @default(DRAFT)
-  maxWordsPerUser Int? // null = không giới hạn số từ mỗi người
-  createdAt       DateTime        @default(now())
-  responses       Response[]
-  wordAggregates  WordAggregate[]
+  id                String      @id @default(uuid())
+  ownerId           String
+  owner             User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  code              String      @unique // mã tham gia, vd "AB12CD"
+  status            TopicStatus @default(DRAFT)
+  currentQuestionId String?     @unique // câu hỏi đang chiếu
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  questions         Question[]
 
   @@index([ownerId])
 }
 
+model Question {
+  id        String         @id @default(uuid())
+  topicId   String
+  topic     Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  order     Int // thứ tự hiển thị, bắt đầu từ 1
+  prompt    String // nội dung câu hỏi
+  status    QuestionStatus @default(DRAFT)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  // ==== Cấu hình (mỗi câu hỏi cấu hình riêng) — bám theo panel Edit của Mentimeter ====
+  type QuestionType @default(WORD_CLOUD)
+
+  // --- Response settings ---
+  responseLimit              Int? // null = KHÔNG GIỚI HẠN; có giá trị = số lượt tối đa/thiết bị
+  maxWordLength              Int     @default(40) // độ dài tối đa 1 từ/cụm từ
+  allowDuplicateFromSameUser Boolean @default(false) // 1 người gửi trùng từ có tính 2 lượt không
+
+  // --- Design ---
+  backgroundColor   String  @default("#FFFFFF")
+  textColorScheme   String  @default("default") // tên bảng màu chữ dùng cho word cloud
+  showLogo          Boolean @default(true)
+  maxWordsDisplayed Int     @default(50) // số từ hiển thị tối đa trên word cloud
+
+  // --- Joining instructions ---
+  showJoiningInfo Boolean         @default(true)
+  joiningInfoType JoiningInfoType @default(QR_CODE)
+
+  // --- Show responses ---
+  resultVisibility      ResultVisibility @default(INSTANT)
+  resultsRevealed       Boolean          @default(false) // dùng cho ON_CLICK: presenter đã bấm hiện chưa
+  showResultsToAudience Boolean          @default(false) // (thêm ngoài Mentimeter) khán giả xem kết quả trên điện thoại
+
+  responses      Response[]
+  wordAggregates WordAggregate[]
+
+  @@unique([topicId, order])
+  @@index([topicId])
+}
+
 model Response {
   id                   String   @id @default(uuid())
-  topicId              String
-  topic                Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  questionId           String
+  question             Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   rawText              String // nguyên văn người dùng gõ
-  normalizedText       String // đã chuẩn hoá theo mục 5
+  normalizedText       String // đã chuẩn hoá theo mục 6
   participantSessionId String // UUID sinh ở client, lưu localStorage
   createdAt            DateTime @default(now())
 
-  @@index([topicId, participantSessionId])
+  @@index([questionId, participantSessionId])
 }
 
 model WordAggregate {
-  id             String @id @default(uuid())
-  topicId        String
-  topic          Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  questionId     String
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   normalizedText String
   displayText    String // giữ bản gõ đầu tiên để hiển thị
-  count          Int    @default(1)
+  count          Int      @default(1)
 
-  @@unique([topicId, normalizedText])
-  @@index([topicId, count])
+  @@unique([questionId, normalizedText])
+  @@index([questionId, count])
 }

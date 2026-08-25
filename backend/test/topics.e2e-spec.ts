@@ -69,17 +69,14 @@ describe('Topics (e2e)', () => {
   });
 
   it('rejects unauthenticated requests', async () => {
-    await request(app.getHttpServer())
-      .post('/api/topics')
-      .send({ title: 'Chủ đề', question: 'Bạn nghĩ gì?' })
-      .expect(401);
+    await request(app.getHttpServer()).post('/api/topics').send({ title: 'Chủ đề' }).expect(401);
   });
 
   it('lets the owner create, read, update, delete their topic, and blocks another user (403)', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/topics')
       .set('Cookie', cookieA)
-      .send({ title: 'Chủ đề của A', question: 'Bạn nghĩ gì?', maxWordsPerUser: 2 })
+      .send({ title: 'Chủ đề của A', description: 'Mô tả' })
       .expect(201);
 
     const created = createRes.body as { id: string; code: string };
@@ -122,6 +119,38 @@ describe('Topics (e2e)', () => {
       .set('Cookie', cookieA)
       .expect(200);
     expect(qrRes.headers['content-type']).toBe('image/png');
+
+    // Setting the current question requires ownership and the question must
+    // belong to this topic.
+    const questionRes = await request(app.getHttpServer())
+      .post(`/api/topics/${topicId}/questions`)
+      .set('Cookie', cookieA)
+      .send({ prompt: 'Bạn nghĩ gì?' })
+      .expect(201);
+    const questionId = (questionRes.body as { id: string }).id;
+
+    await request(app.getHttpServer())
+      .post(`/api/topics/${topicId}/current-question`)
+      .set('Cookie', cookieB)
+      .send({ questionId })
+      .expect(403);
+
+    const currentQuestionRes = await request(app.getHttpServer())
+      .post(`/api/topics/${topicId}/current-question`)
+      .set('Cookie', cookieA)
+      .send({ questionId })
+      .expect(201);
+    expect((currentQuestionRes.body as { currentQuestionId: string }).currentQuestionId).toBe(
+      questionId,
+    );
+
+    // Becoming the current question also opens it for responses, so
+    // audiences don't land on a "not started" question with no way to start it.
+    const activatedQuestionRes = await request(app.getHttpServer())
+      .get(`/api/questions/${questionId}`)
+      .set('Cookie', cookieA)
+      .expect(200);
+    expect((activatedQuestionRes.body as { status: string }).status).toBe('ACTIVE');
 
     await request(app.getHttpServer())
       .get('/api/topics')

@@ -1,13 +1,4 @@
-import {
-  IsEnum,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { TopicStatus } from '@prisma/client';
 
 export class UpdateTopicDto {
@@ -19,16 +10,8 @@ export class UpdateTopicDto {
 
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  question?: string;
-
-  // null = không giới hạn số từ mỗi người; @IsOptional() bỏ qua validate khi null/undefined.
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(10)
-  maxWordsPerUser?: number | null;
+  @MaxLength(1000)
+  description?: string;
 
   @IsOptional()
   @IsEnum(TopicStatus)

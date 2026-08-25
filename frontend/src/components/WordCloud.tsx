@@ -22,7 +22,7 @@ const WIDTH = 640;
 const HEIGHT = 400;
 const MIN_FONT_SIZE = 16;
 const MAX_FONT_SIZE = 72;
-const COLORS = ['#1677ff', '#722ed1', '#13a8a8', '#eb2f96', '#fa8c16', '#52c41a'];
+const DEFAULT_COLORS = ['#1677ff', '#722ed1', '#13a8a8', '#eb2f96', '#fa8c16', '#52c41a'];
 
 function fontSizeFor(count: number, minCount: number, maxCount: number): number {
   if (maxCount === minCount) return (MIN_FONT_SIZE + MAX_FONT_SIZE) / 2;
@@ -30,7 +30,7 @@ function fontSizeFor(count: number, minCount: number, maxCount: number): number 
   return MIN_FONT_SIZE + ratio * (MAX_FONT_SIZE - MIN_FONT_SIZE);
 }
 
-export function WordCloud({ words }: { words: WordCloudWord[] }) {
+export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloudWord[]; colors?: string[] }) {
   const [positioned, setPositioned] = useState<PositionedWord[]>([]);
   const seenWords = useRef<Set<string>>(new Set());
 
@@ -85,7 +85,7 @@ export function WordCloud({ words }: { words: WordCloudWord[] }) {
               style={{
                 fontSize: w.size,
                 fontFamily: 'sans-serif',
-                fill: COLORS[i % COLORS.length],
+                fill: colors[i % colors.length],
               }}
               textAnchor="middle"
             >

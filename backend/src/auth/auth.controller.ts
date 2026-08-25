@@ -15,7 +15,11 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { GoogleProfile } from './strategies/google.strategy';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
-import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_COOKIE_MAX_AGE_MS } from './auth.constants';
+import {
+  ACCESS_TOKEN_COOKIE,
+  ACCESS_TOKEN_COOKIE_MAX_AGE_MS,
+  ACCESS_TOKEN_COOKIE_OPTIONS,
+} from './auth.constants';
 
 @Controller('auth')
 export class AuthController {
@@ -34,10 +38,7 @@ export class AuthController {
     const token = this.authService.signToken(user);
 
     res.cookie(ACCESS_TOKEN_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
+      ...ACCESS_TOKEN_COOKIE_OPTIONS,
       maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS,
     });
     res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
@@ -56,7 +57,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   logout(@Res() res: Response) {
-    res.clearCookie(ACCESS_TOKEN_COOKIE, { path: '/' });
+    res.clearCookie(ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_COOKIE_OPTIONS);
     res.json({ success: true });
   }
 }

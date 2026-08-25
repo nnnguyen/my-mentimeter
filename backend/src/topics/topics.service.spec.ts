@@ -2,7 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TopicsService } from './topics.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { WordCloudService } from '../word-cloud/word-cloud.service';
+import { WordCloudGateway } from '../realtime/word-cloud.gateway';
 
 describe('TopicsService', () => {
   let service: TopicsService;
@@ -14,18 +14,20 @@ describe('TopicsService', () => {
       update: jest.Mock;
       delete: jest.Mock;
     };
+    question: { findUnique: jest.Mock };
+    $transaction: jest.Mock;
   };
-  let wordCloudService: { getSnapshot: jest.Mock };
+  let wordCloudGateway: { broadcastQuestionChanged: jest.Mock };
 
   const ownerId = 'owner-1';
   const topic = {
     id: 'topic-1',
     ownerId,
     title: 'Chủ đề',
-    question: 'Bạn nghĩ gì?',
+    description: 'Mô tả',
     code: 'ABC123',
     status: 'DRAFT',
-    maxWordsPerUser: 3,
+    currentQuestionId: null,
     createdAt: new Date(),
   };
 
@@ -38,14 +40,16 @@ describe('TopicsService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      question: { findUnique: jest.fn() },
+      $transaction: jest.fn(),
     };
-    wordCloudService = { getSnapshot: jest.fn() };
+    wordCloudGateway = { broadcastQuestionChanged: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TopicsService,
         { provide: PrismaService, useValue: prisma },
-        { provide: WordCloudService, useValue: wordCloudService },
+        { provide: WordCloudGateway, useValue: wordCloudGateway },
       ],
     }).compile();
 
@@ -61,7 +65,7 @@ describe('TopicsService', () => {
 
       const result = await service.create(ownerId, {
         title: topic.title,
-        question: topic.question,
+        description: topic.description,
       });
 
       expect(prisma.topic.findUnique).toHaveBeenCalledTimes(2);
@@ -108,22 +112,77 @@ describe('TopicsService', () => {
     });
   });
 
-  describe('getWordCloud', () => {
+  describe('setCurrentQuestion', () => {
+    const question = { id: 'question-1', topicId: topic.id, status: 'DRAFT' };
+
     it('rejects when the topic belongs to another user', async () => {
       prisma.topic.findUnique.mockResolvedValue(topic);
-      await expect(service.getWordCloud(topic.id, 'someone-else')).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-      expect(wordCloudService.getSnapshot).not.toHaveBeenCalled();
+      await expect(
+        service.setCurrentQuestion(topic.id, 'someone-else', question.id),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('delegates to WordCloudService once ownership is verified', async () => {
+    it('rejects when the question does not belong to this topic', async () => {
       prisma.topic.findUnique.mockResolvedValue(topic);
-      const snapshot = { words: [], totalResponses: 0, uniqueWords: 0 };
-      wordCloudService.getSnapshot.mockResolvedValue(snapshot);
+      prisma.question.findUnique.mockResolvedValue({ id: question.id, topicId: 'other-topic' });
+      await expect(service.setCurrentQuestion(topic.id, ownerId, question.id)).rejects.toThrow();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
 
-      await expect(service.getWordCloud(topic.id, ownerId)).resolves.toEqual(snapshot);
-      expect(wordCloudService.getSnapshot).toHaveBeenCalledWith(topic.id);
+    it('sets currentQuestionId and opens the new question for responses', async () => {
+      prisma.topic.findUnique.mockResolvedValue(topic); // currentQuestionId: null
+      prisma.question.findUnique.mockResolvedValue(question);
+
+      const tx = {
+        question: {
+          updateMany: jest.fn(),
+          update: jest.fn().mockResolvedValue({ ...question, status: 'ACTIVE' }),
+        },
+        topic: { update: jest.fn().mockResolvedValue({ ...topic, currentQuestionId: question.id }) },
+      };
+      prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) => cb(tx));
+
+      const result = await service.setCurrentQuestion(topic.id, ownerId, question.id);
+
+      expect(tx.question.updateMany).not.toHaveBeenCalled();
+      expect(tx.question.update).toHaveBeenCalledWith({
+        where: { id: question.id },
+        data: { status: 'ACTIVE' },
+      });
+      expect(tx.topic.update).toHaveBeenCalledWith({
+        where: { id: topic.id },
+        data: { currentQuestionId: question.id },
+      });
+      expect(result.currentQuestionId).toBe(question.id);
+      expect(wordCloudGateway.broadcastQuestionChanged).toHaveBeenCalledWith(topic.id, {
+        ...question,
+        status: 'ACTIVE',
+      });
+    });
+
+    it('closes the previously current question when switching to a different one', async () => {
+      const topicWithCurrent = { ...topic, currentQuestionId: 'question-0' };
+      prisma.topic.findUnique.mockResolvedValue(topicWithCurrent);
+      prisma.question.findUnique.mockResolvedValue(question);
+
+      const tx = {
+        question: {
+          updateMany: jest.fn(),
+          update: jest.fn().mockResolvedValue({ ...question, status: 'ACTIVE' }),
+        },
+        topic: {
+          update: jest.fn().mockResolvedValue({ ...topicWithCurrent, currentQuestionId: question.id }),
+        },
+      };
+      prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) => cb(tx));
+
+      await service.setCurrentQuestion(topic.id, ownerId, question.id);
+
+      expect(tx.question.updateMany).toHaveBeenCalledWith({
+        where: { id: 'question-0', status: 'ACTIVE' },
+        data: { status: 'CLOSED' },
+      });
     });
   });
 });

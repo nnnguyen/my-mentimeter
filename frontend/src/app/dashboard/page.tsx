@@ -8,19 +8,17 @@ import {
   Card,
   Form,
   Input,
-  InputNumber,
   Layout,
   Modal,
   Popconfirm,
   Space,
   Spin,
-  Switch,
   Table,
   Tag,
   Typography,
   message,
 } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { apiFetch } from '@/lib/api';
 
 const { Header, Content } = Layout;
@@ -36,10 +34,9 @@ interface SessionUser {
 interface Topic {
   id: string;
   title: string;
-  question: string;
+  description: string | null;
   code: string;
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
-  maxWordsPerUser: number | null;
   createdAt: string;
 }
 
@@ -61,9 +58,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [limitEnabled, setLimitEnabled] = useState(false);
-  const [wordLimit, setWordLimit] = useState(3);
   const [form] = Form.useForm();
+  const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm] = Form.useForm();
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   const loadTopics = useCallback(async () => {
     const res = await apiFetch('/api/topics');
@@ -93,26 +92,64 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const handleCreate = async (values: { title: string; question: string }) => {
+  const handleCreate = async (values: { title: string; description?: string }) => {
     setCreating(true);
     try {
-      const payload = {
-        ...values,
-        maxWordsPerUser: limitEnabled ? wordLimit : null,
-      };
-      const res = await apiFetch('/api/topics', { method: 'POST', body: JSON.stringify(payload) });
+      const res = await apiFetch('/api/topics', { method: 'POST', body: JSON.stringify(values) });
       if (!res.ok) throw new Error('create failed');
       const { id } = await res.json();
       message.success('Tạo topic thành công');
       setModalOpen(false);
       form.resetFields();
-      setLimitEnabled(false);
-      setWordLimit(3);
-      router.push(`/topics/${id}`);
+      router.push(`/topics/${id}/edit`);
     } catch {
       message.error('Tạo topic thất bại');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEditModal = (topic: Topic) => {
+    setEditingTopic(topic);
+    editForm.setFieldsValue({ title: topic.title, description: topic.description ?? '' });
+  };
+
+  const handleEditSubmit = async (values: { title: string; description?: string }) => {
+    if (!editingTopic) return;
+    setSavingEdit(true);
+    try {
+      const res = await apiFetch(`/api/topics/${editingTopic.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) throw new Error('update failed');
+      const updated: Topic = await res.json();
+      setTopics((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      message.success('Đã cập nhật topic');
+      setEditingTopic(null);
+    } catch {
+      message.error('Cập nhật thất bại');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleToggleStatus = async (topic: Topic) => {
+    const nextStatus = topic.status === 'ACTIVE' ? 'CLOSED' : 'ACTIVE';
+    setUpdatingStatusId(topic.id);
+    try {
+      const res = await apiFetch(`/api/topics/${topic.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (!res.ok) throw new Error('update failed');
+      const updated: Topic = await res.json();
+      setTopics((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      message.success(nextStatus === 'ACTIVE' ? 'Đã mở lại topic' : 'Đã đóng topic');
+    } catch {
+      message.error('Cập nhật trạng thái thất bại');
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -192,8 +229,22 @@ export default function DashboardPage() {
                 title: 'Hành động',
                 render: (_: unknown, record: Topic) => (
                   <Space>
-                    <Button size="small" onClick={() => router.push(`/topics/${record.id}`)}>
+                    <Button size="small" onClick={() => router.push(`/topics/${record.id}/edit`)}>
                       Mở
+                    </Button>
+                    <Button size="small" icon={<EditOutlined />} onClick={() => openEditModal(record)}>
+                      Sửa
+                    </Button>
+                    <Button
+                      size="small"
+                      loading={updatingStatusId === record.id}
+                      onClick={() => handleToggleStatus(record)}
+                    >
+                      {record.status === 'ACTIVE'
+                        ? 'Đóng'
+                        : record.status === 'CLOSED'
+                          ? 'Mở lại'
+                          : 'Mở'}
                     </Button>
                     <Popconfirm
                       title="Xoá topic này?"
@@ -230,27 +281,31 @@ export default function DashboardPage() {
           >
             <Input maxLength={200} />
           </Form.Item>
-          <Form.Item
-            name="question"
-            label="Câu hỏi"
-            rules={[{ required: true, message: 'Nhập câu hỏi' }]}
-          >
-            <Input.TextArea maxLength={500} rows={3} />
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea maxLength={1000} rows={3} />
           </Form.Item>
-          <Form.Item label="Giới hạn số từ mỗi người">
-            <Space>
-              <Switch checked={limitEnabled} onChange={setLimitEnabled} />
-              {limitEnabled ? (
-                <InputNumber
-                  min={1}
-                  max={10}
-                  value={wordLimit}
-                  onChange={(value) => setWordLimit(value ?? 3)}
-                />
-              ) : (
-                <Text type="secondary">Không giới hạn</Text>
-              )}
-            </Space>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Sửa topic"
+        open={editingTopic !== null}
+        onCancel={() => setEditingTopic(null)}
+        onOk={() => editForm.submit()}
+        confirmLoading={savingEdit}
+        okText="Lưu"
+        cancelText="Huỷ"
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
+          <Form.Item
+            name="title"
+            label="Tiêu đề"
+            rules={[{ required: true, message: 'Nhập tiêu đề' }]}
+          >
+            <Input maxLength={200} />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea maxLength={1000} rows={3} />
           </Form.Item>
         </Form>
       </Modal>

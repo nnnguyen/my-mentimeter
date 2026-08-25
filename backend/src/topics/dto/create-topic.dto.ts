@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateTopicDto {
   @IsString()
@@ -6,15 +6,8 @@ export class CreateTopicDto {
   @MaxLength(200)
   title: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  question: string;
-
-  // null = không giới hạn số từ mỗi người; @IsOptional() bỏ qua validate khi null/undefined.
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(10)
-  maxWordsPerUser?: number | null;
+  @IsString()
+  @MaxLength(1000)
+  description?: string;
 }
