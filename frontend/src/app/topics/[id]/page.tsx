@@ -3,10 +3,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Card, Space, Spin, Statistic, Tag, Typography, message } from 'antd';
-import { ArrowLeftOutlined, CopyOutlined, DownloadOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined,
+  CopyOutlined,
+  DownloadOutlined,
+  TableOutlined,
+} from '@ant-design/icons';
 import { io, Socket } from 'socket.io-client';
 import { apiFetch, API_BASE_URL } from '@/lib/api';
 import { WordCloud, WordCloudWord } from '@/components/WordCloud';
+import { WordStatsTable } from '@/components/WordStatsTable';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -61,6 +67,7 @@ export default function TopicDetailPage() {
     uniqueWords: 0,
   });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
+  const [showTable, setShowTable] = useState(true);
 
   const loadTopic = useCallback(async () => {
     const res = await apiFetch(`/api/topics/${id}`);
@@ -265,15 +272,28 @@ export default function TopicDetailPage() {
               <Statistic title="Tổng câu trả lời" value={wordCloud.totalResponses} />
               <Statistic title="Số từ khác nhau" value={wordCloud.uniqueWords} />
             </Space>
-            <Tag color={CONNECTION_LABEL[connectionStatus].color}>
-              {CONNECTION_LABEL[connectionStatus].text}
-            </Tag>
+            <Space>
+              <Button size="small" icon={<TableOutlined />} onClick={() => setShowTable((v) => !v)}>
+                {showTable ? 'Ẩn bảng' : 'Hiện bảng'}
+              </Button>
+              <Tag color={CONNECTION_LABEL[connectionStatus].color}>
+                {CONNECTION_LABEL[connectionStatus].text}
+              </Tag>
+            </Space>
           </div>
 
           {wordCloud.words.length > 0 ? (
             <WordCloud words={wordCloud.words} />
           ) : (
             <Text type="secondary">Chưa có câu trả lời nào.</Text>
+          )}
+
+          {showTable && (
+            <WordStatsTable
+              words={wordCloud.words}
+              totalResponses={wordCloud.totalResponses}
+              filename={`wordcloud-${topic.code}.csv`}
+            />
           )}
         </Space>
       </Card>
