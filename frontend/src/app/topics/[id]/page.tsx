@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, Card, Space, Spin, Tag, Typography, message } from 'antd';
+import { Button, Card, Space, Spin, Statistic, Tag, Typography, message } from 'antd';
 import { ArrowLeftOutlined, CopyOutlined, DownloadOutlined } from '@ant-design/icons';
-import { apiFetch } from '@/lib/api';
+import { io, Socket } from 'socket.io-client';
+import { apiFetch, API_BASE_URL } from '@/lib/api';
+import { WordCloud, WordCloudWord } from '@/components/WordCloud';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -17,6 +19,23 @@ interface Topic {
   maxWordsPerUser: number;
   createdAt: string;
 }
+
+interface WordCloudSnapshot {
+  words: WordCloudWord[];
+  totalResponses: number;
+  uniqueWords: number;
+}
+
+type ConnectionStatus = 'connected' | 'reconnecting' | 'polling';
+
+const CONNECTION_LABEL: Record<ConnectionStatus, { text: string; color: string }> = {
+  connected: { text: 'Realtime', color: 'green' },
+  reconnecting: { text: 'Đang kết nối lại...', color: 'gold' },
+  polling: { text: 'Polling mỗi 3s', color: 'default' },
+};
+
+const RECONNECT_GRACE_MS = 5000;
+const POLL_INTERVAL_MS = 3000;
 
 const STATUS_COLOR: Record<Topic['status'], string> = {
   DRAFT: 'default',
@@ -36,6 +55,12 @@ export default function TopicDetailPage() {
   const [loading, setLoading] = useState(true);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [wordCloud, setWordCloud] = useState<WordCloudSnapshot>({
+    words: [],
+    totalResponses: 0,
+    uniqueWords: 0,
+  });
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   const loadTopic = useCallback(async () => {
     const res = await apiFetch(`/api/topics/${id}`);
@@ -64,6 +89,71 @@ export default function TopicDetailPage() {
       });
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic?.id]);
+
+  // Realtime word cloud: fetch snapshot via HTTP first, THEN connect the socket
+  // (mục 3 CLAUDE.md) — avoids a blank screen before the first socket event.
+  useEffect(() => {
+    if (!topic) return;
+    const topicId = topic.id;
+    let cancelled = false;
+    let socket: Socket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    const fetchSnapshot = async () => {
+      const res = await apiFetch(`/api/topics/${topicId}/wordcloud`);
+      if (!cancelled && res.ok) {
+        setWordCloud(await res.json());
+      }
+    };
+
+    const stopPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    };
+
+    fetchSnapshot().then(() => {
+      if (cancelled) return;
+
+      socket = io(`${API_BASE_URL}/presenter`, { withCredentials: true });
+
+      socket.on('connect', () => {
+        setConnectionStatus('connected');
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        const wasPolling = pollInterval !== null;
+        stopPolling();
+        socket?.emit('join', { topicId });
+        if (wasPolling) {
+          void fetchSnapshot();
+        }
+      });
+
+      socket.on('wordcloud:update', (data: WordCloudSnapshot) => {
+        setWordCloud(data);
+      });
+
+      socket.on('disconnect', () => {
+        setConnectionStatus('reconnecting');
+        reconnectTimer = setTimeout(() => {
+          setConnectionStatus('polling');
+          pollInterval = setInterval(fetchSnapshot, POLL_INTERVAL_MS);
+        }, RECONNECT_GRACE_MS);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      stopPolling();
+      socket?.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic?.id]);
@@ -104,7 +194,7 @@ export default function TopicDetailPage() {
   }
 
   return (
-    <main style={{ maxWidth: 640, margin: '0 auto', padding: 24 }}>
+    <main style={{ maxWidth: 760, margin: '0 auto', padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
         style={{ marginBottom: 16 }}
@@ -159,6 +249,26 @@ export default function TopicDetailPage() {
               {voteUrl}
             </Text>
           </div>
+        </Space>
+      </Card>
+
+      <Card style={{ marginTop: 24 }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Space size="large">
+              <Statistic title="Tổng câu trả lời" value={wordCloud.totalResponses} />
+              <Statistic title="Số từ khác nhau" value={wordCloud.uniqueWords} />
+            </Space>
+            <Tag color={CONNECTION_LABEL[connectionStatus].color}>
+              {CONNECTION_LABEL[connectionStatus].text}
+            </Tag>
+          </div>
+
+          {wordCloud.words.length > 0 ? (
+            <WordCloud words={wordCloud.words} />
+          ) : (
+            <Text type="secondary">Chưa có câu trả lời nào.</Text>
+          )}
         </Space>
       </Card>
     </main>

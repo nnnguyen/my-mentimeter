@@ -7,6 +7,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PublicTopicsService } from './public-topics.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WordCloudGateway } from '../realtime/word-cloud.gateway';
 
 describe('PublicTopicsService', () => {
   let service: PublicTopicsService;
@@ -16,6 +17,7 @@ describe('PublicTopicsService', () => {
     $transaction: jest.Mock;
   };
   let tx: { response: { create: jest.Mock }; wordAggregate: { upsert: jest.Mock } };
+  let wordCloudGateway: { broadcastSnapshot: jest.Mock };
 
   const activeTopic = {
     id: 'topic-1',
@@ -36,9 +38,14 @@ describe('PublicTopicsService', () => {
       response: { count: jest.fn() },
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(tx)),
     };
+    wordCloudGateway = { broadcastSnapshot: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PublicTopicsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        PublicTopicsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: WordCloudGateway, useValue: wordCloudGateway },
+      ],
     }).compile();
 
     service = module.get(PublicTopicsService);
@@ -120,6 +127,14 @@ describe('PublicTopicsService', () => {
         },
       });
       expect(result).toEqual({ submittedCount: 1, maxWordsPerUser: 2 });
+      expect(wordCloudGateway.broadcastSnapshot).toHaveBeenCalledWith(activeTopic.id);
+    });
+
+    it('does not broadcast when the submission is rejected', async () => {
+      prisma.topic.findUnique.mockResolvedValue(activeTopic);
+      prisma.response.count.mockResolvedValue(0);
+      await service.createResponse('ABC123', { ...dto, text: '!!!' }).catch(() => undefined);
+      expect(wordCloudGateway.broadcastSnapshot).not.toHaveBeenCalled();
     });
   });
 });

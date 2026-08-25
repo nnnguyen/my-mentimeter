@@ -2,6 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TopicsService } from './topics.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WordCloudService } from '../word-cloud/word-cloud.service';
 
 describe('TopicsService', () => {
   let service: TopicsService;
@@ -14,6 +15,7 @@ describe('TopicsService', () => {
       delete: jest.Mock;
     };
   };
+  let wordCloudService: { getSnapshot: jest.Mock };
 
   const ownerId = 'owner-1';
   const topic = {
@@ -37,9 +39,14 @@ describe('TopicsService', () => {
         delete: jest.fn(),
       },
     };
+    wordCloudService = { getSnapshot: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TopicsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        TopicsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: WordCloudService, useValue: wordCloudService },
+      ],
     }).compile();
 
     service = module.get(TopicsService);
@@ -98,6 +105,25 @@ describe('TopicsService', () => {
         ForbiddenException,
       );
       expect(prisma.topic.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getWordCloud', () => {
+    it('rejects when the topic belongs to another user', async () => {
+      prisma.topic.findUnique.mockResolvedValue(topic);
+      await expect(service.getWordCloud(topic.id, 'someone-else')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(wordCloudService.getSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('delegates to WordCloudService once ownership is verified', async () => {
+      prisma.topic.findUnique.mockResolvedValue(topic);
+      const snapshot = { words: [], totalResponses: 0, uniqueWords: 0 };
+      wordCloudService.getSnapshot.mockResolvedValue(snapshot);
+
+      await expect(service.getWordCloud(topic.id, ownerId)).resolves.toEqual(snapshot);
+      expect(wordCloudService.getSnapshot).toHaveBeenCalledWith(topic.id);
     });
   });
 });

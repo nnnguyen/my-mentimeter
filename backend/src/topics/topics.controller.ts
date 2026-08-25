@@ -52,4 +52,9 @@ export class TopicsController {
     res.set('Content-Type', 'image/png');
     res.send(png);
   }
+
+  @Get(':id/wordcloud')
+  getWordCloud(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.topicsService.getWordCloud(id, user.id);
+  }
 }

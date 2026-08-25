@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizeWord, sanitizeDisplayText } from '../common/normalize-word';
+import { WordCloudGateway } from '../realtime/word-cloud.gateway';
 import { CreateResponseDto } from './dto/create-response.dto';
 
 export interface PublicTopicInfo {
@@ -24,7 +25,10 @@ export interface CreateResponseResult {
 
 @Injectable()
 export class PublicTopicsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly wordCloudGateway: WordCloudGateway,
+  ) {}
 
   async getPublicInfo(code: string): Promise<PublicTopicInfo> {
     const topic = await this.prisma.topic.findUnique({ where: { code } });
@@ -81,6 +85,8 @@ export class PublicTopicsService {
         },
       });
     });
+
+    await this.wordCloudGateway.broadcastSnapshot(topic.id);
 
     return { submittedCount: existingCount + 1, maxWordsPerUser: topic.maxWordsPerUser };
   }
