@@ -1,10 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Avatar, Button, Card, Spin, Typography } from 'antd';
+import {
+  Avatar,
+  Button,
+  Card,
+  Form,
+  Input,
+  InputNumber,
+  Layout,
+  Modal,
+  Popconfirm,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { apiFetch } from '@/lib/api';
 
+const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 interface SessionUser {
@@ -14,10 +32,40 @@ interface SessionUser {
   avatarUrl: string | null;
 }
 
+interface Topic {
+  id: string;
+  title: string;
+  question: string;
+  code: string;
+  status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
+  maxWordsPerUser: number;
+  createdAt: string;
+}
+
+const STATUS_COLOR: Record<Topic['status'], string> = {
+  DRAFT: 'default',
+  ACTIVE: 'green',
+  CLOSED: 'red',
+};
+const STATUS_LABEL: Record<Topic['status'], string> = {
+  DRAFT: 'Nháp',
+  ACTIVE: 'Đang mở',
+  CLOSED: 'Đã đóng',
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm();
+
+  const loadTopics = useCallback(async () => {
+    const res = await apiFetch('/api/topics');
+    if (res.ok) setTopics(await res.json());
+  }, []);
 
   useEffect(() => {
     apiFetch('/api/auth/session')
@@ -28,15 +76,49 @@ export default function DashboardPage() {
         }
         return res.json();
       })
-      .then((data) => {
-        if (data) setUser(data);
+      .then(async (data) => {
+        if (data) {
+          setUser(data);
+          await loadTopics();
+        }
       })
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, loadTopics]);
 
   const handleLogout = async () => {
     await apiFetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
+  };
+
+  const handleCreate = async (values: {
+    title: string;
+    question: string;
+    maxWordsPerUser?: number;
+  }) => {
+    setCreating(true);
+    try {
+      const res = await apiFetch('/api/topics', { method: 'POST', body: JSON.stringify(values) });
+      if (!res.ok) throw new Error('create failed');
+      const { id } = await res.json();
+      message.success('Tạo topic thành công');
+      setModalOpen(false);
+      form.resetFields();
+      router.push(`/topics/${id}`);
+    } catch {
+      message.error('Tạo topic thất bại');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const res = await apiFetch(`/api/topics/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      message.success('Đã xoá topic');
+      await loadTopics();
+    } else {
+      message.error('Xoá thất bại');
+    }
   };
 
   if (loading) {
@@ -52,23 +134,118 @@ export default function DashboardPage() {
   }
 
   return (
-    <main style={{ maxWidth: 480, margin: '0 auto', padding: 24 }}>
-      <Card>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Avatar src={user.avatarUrl} size={64}>
+    <Layout style={{ minHeight: '100vh' }}>
+      <Header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#fff',
+          borderBottom: '1px solid #f0f0f0',
+        }}
+      >
+        <Title level={4} style={{ margin: 0 }}>
+          Mentimeter
+        </Title>
+        <Space>
+          <Avatar src={user.avatarUrl} size="small">
             {user.name?.[0]}
           </Avatar>
-          <div>
-            <Title level={4} style={{ margin: 0 }}>
-              {user.name}
-            </Title>
-            <Text type="secondary">{user.email}</Text>
-          </div>
-        </div>
-        <Button style={{ marginTop: 24 }} onClick={handleLogout}>
-          Đăng xuất
-        </Button>
-      </Card>
-    </main>
+          <Text>{user.name}</Text>
+          <Button onClick={handleLogout}>Đăng xuất</Button>
+        </Space>
+      </Header>
+      <Content style={{ padding: 24, maxWidth: 960, margin: '0 auto', width: '100%' }}>
+        <Card
+          title="Danh sách topic"
+          extra={
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+              Tạo topic
+            </Button>
+          }
+        >
+          <Table
+            rowKey="id"
+            dataSource={topics}
+            locale={{ emptyText: 'Chưa có topic nào' }}
+            columns={[
+              { title: 'Tiêu đề', dataIndex: 'title' },
+              { title: 'Mã', dataIndex: 'code' },
+              {
+                title: 'Trạng thái',
+                dataIndex: 'status',
+                render: (status: Topic['status']) => (
+                  <Tag color={STATUS_COLOR[status]}>{STATUS_LABEL[status]}</Tag>
+                ),
+              },
+              {
+                title: 'Ngày tạo',
+                dataIndex: 'createdAt',
+                render: (value: string) => new Date(value).toLocaleString('vi-VN'),
+              },
+              {
+                title: 'Hành động',
+                render: (_: unknown, record: Topic) => (
+                  <Space>
+                    <Button size="small" onClick={() => router.push(`/topics/${record.id}`)}>
+                      Mở
+                    </Button>
+                    <Popconfirm
+                      title="Xoá topic này?"
+                      onConfirm={() => handleDelete(record.id)}
+                      okText="Xoá"
+                      cancelText="Huỷ"
+                    >
+                      <Button size="small" danger>
+                        Xoá
+                      </Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      </Content>
+
+      <Modal
+        title="Tạo topic mới"
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        onOk={() => form.submit()}
+        confirmLoading={creating}
+        okText="Tạo"
+        cancelText="Huỷ"
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleCreate}
+          initialValues={{ maxWordsPerUser: 3 }}
+        >
+          <Form.Item
+            name="title"
+            label="Tiêu đề"
+            rules={[{ required: true, message: 'Nhập tiêu đề' }]}
+          >
+            <Input maxLength={200} />
+          </Form.Item>
+          <Form.Item
+            name="question"
+            label="Câu hỏi"
+            rules={[{ required: true, message: 'Nhập câu hỏi' }]}
+          >
+            <Input.TextArea maxLength={500} rows={3} />
+          </Form.Item>
+          <Form.Item
+            name="maxWordsPerUser"
+            label="Số từ tối đa mỗi người"
+            rules={[{ required: true }]}
+          >
+            <InputNumber min={1} max={10} style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </Layout>
   );
 }

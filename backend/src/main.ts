@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
@@ -8,6 +9,9 @@ async function bootstrap() {
   app.use(cookieParser());
   app.enableCors({ origin: process.env.FRONTEND_URL, credentials: true });
   app.setGlobalPrefix('api');
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+  );
   await app.listen(process.env.PORT ?? 3000);
 }
 void bootstrap();
