@@ -7,7 +7,11 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
-  app.enableCors({ origin: process.env.FRONTEND_URL, credentials: true });
+  const origins = process.env.FRONTEND_URL?.split(',') ?? [];
+  app.enableCors({
+    origin: origins,
+    credentials: true,
+  });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
