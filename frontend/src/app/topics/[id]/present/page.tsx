@@ -12,6 +12,8 @@ import {
   LeftOutlined,
   QrcodeOutlined,
   RightOutlined,
+  TeamOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import { io, Socket } from 'socket.io-client';
 import { apiFetch, API_BASE_URL } from '@/lib/api';
@@ -36,6 +38,7 @@ interface WordCloudSnapshot {
   words: WordCloudWord[];
   totalResponses: number;
   uniqueWords: number;
+  uniqueParticipants: number;
 }
 
 interface WordCloudUpdateEvent extends Partial<WordCloudSnapshot> {
@@ -81,8 +84,10 @@ export default function TopicPresentPage() {
     words: [],
     totalResponses: 0,
     uniqueWords: 0,
+    uniqueParticipants: 0,
   });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
+  const [joinedCount, setJoinedCount] = useState(0);
   const [qrPanelOpen, setQrPanelOpen] = useState(false);
   const [statsModalOpen, setStatsModalOpen] = useState(false);
 
@@ -158,7 +163,7 @@ export default function TopicPresentPage() {
   // to it) so a Prev/Sau press on another tab/device stays in sync here too.
   useEffect(() => {
     if (!topic || !currentQuestion) {
-      setWordCloud({ words: [], totalResponses: 0, uniqueWords: 0 });
+      setWordCloud({ words: [], totalResponses: 0, uniqueWords: 0, uniqueParticipants: 0 });
       return;
     }
     const topicId = topic.id;
@@ -195,10 +200,19 @@ export default function TopicPresentPage() {
         }
         const wasPolling = pollInterval !== null;
         stopPolling();
-        socket?.emit('join', { topicId });
+        socket?.emit('join', { topicId }, (ack: { joinedCount?: number }) => {
+          // The presenter socket reconnects on every question change, so the
+          // ack (not just the participants:joined broadcast) is what keeps
+          // this accurate right after a switch.
+          if (ack?.joinedCount !== undefined) setJoinedCount(ack.joinedCount);
+        });
         if (wasPolling) {
           void fetchSnapshot();
         }
+      });
+
+      socket.on('participants:joined', (data: { count: number }) => {
+        setJoinedCount(data.count);
       });
 
       socket.on('wordcloud:update', (data: WordCloudUpdateEvent) => {
@@ -207,6 +221,7 @@ export default function TopicPresentPage() {
             words: data.words ?? [],
             totalResponses: data.totalResponses,
             uniqueWords: data.uniqueWords ?? 0,
+            uniqueParticipants: data.uniqueParticipants ?? 0,
           });
         }
       });
@@ -217,6 +232,7 @@ export default function TopicPresentPage() {
             words: data.words ?? [],
             totalResponses: data.totalResponses,
             uniqueWords: data.uniqueWords ?? 0,
+            uniqueParticipants: data.uniqueParticipants ?? 0,
           });
         }
       });
@@ -402,6 +418,18 @@ export default function TopicPresentPage() {
                       ? `Giới hạn: ${currentQuestion.responseLimit} từ/người`
                       : 'Không giới hạn số từ'}
                   </Text>
+                  <div style={{ marginTop: 8 }}>
+                    <Space size="large">
+                      <Space size="small">
+                        <UserOutlined />
+                        <Text type="secondary">{joinedCount} người đã join</Text>
+                      </Space>
+                      <Space size="small">
+                        <TeamOutlined />
+                        <Text type="secondary">{wordCloud.uniqueParticipants} người đã trả lời</Text>
+                      </Space>
+                    </Space>
+                  </div>
                 </>
               )}
             </div>
@@ -514,6 +542,7 @@ export default function TopicPresentPage() {
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
             <Space size="large">
               <Statistic title="Tổng câu trả lời" value={wordCloud.totalResponses} />
+              <Statistic title="Người tham gia" value={wordCloud.uniqueParticipants} />
               {!hidden && <Statistic title="Số từ khác nhau" value={wordCloud.uniqueWords} />}
             </Space>
 
