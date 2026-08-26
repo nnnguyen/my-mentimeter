@@ -17,7 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @WebSocketGateway({
   namespace: '/audience',
-  cors: { origin: process.env.FRONTEND_URL, credentials: true },
+  cors: { origin: process.env.FRONTEND_URL?.split(',') ?? [], credentials: true },
 })
 export class AudienceGateway {
   @WebSocketServer()
