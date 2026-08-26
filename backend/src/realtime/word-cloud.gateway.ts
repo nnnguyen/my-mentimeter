@@ -47,7 +47,7 @@ interface QuestionChangedPayload {
 
 @WebSocketGateway({
   namespace: '/presenter',
-  cors: { origin: process.env.FRONTEND_URL, credentials: true },
+  cors: { origin: process.env.FRONTEND_URL?.split(',') ?? [], credentials: true },
 })
 export class WordCloudGateway implements OnGatewayConnection {
   @WebSocketServer()
