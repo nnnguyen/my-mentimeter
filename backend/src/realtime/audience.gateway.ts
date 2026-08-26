@@ -1,13 +1,21 @@
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
-import type { Server, Socket } from 'socket.io';
+import { forwardRef, Inject, Logger } from '@nestjs/common';
+import type { Namespace, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
+import { WordCloudGateway } from './word-cloud.gateway';
+
+interface AudienceSocketData {
+  topicId?: string;
+}
+
+type AudienceSocket = Socket<any, any, any, AudienceSocketData>;
 
 /**
  * Public namespace for audience devices (/join/[code]). No auth — anyone with
@@ -19,17 +27,25 @@ import { PrismaService } from '../prisma/prisma.service';
   namespace: '/audience',
   cors: { origin: process.env.FRONTEND_URL?.split(',') ?? [], credentials: true },
 })
-export class AudienceGateway {
+export class AudienceGateway implements OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server: Namespace;
 
   private readonly logger = new Logger(AudienceGateway.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => WordCloudGateway))
+    private readonly wordCloudGateway: WordCloudGateway,
+  ) {}
+
+  joinedCount(topicId: string): number {
+    return this.server.adapter.rooms.get(`topic:${topicId}`)?.size ?? 0;
+  }
 
   @SubscribeMessage('join')
   async handleJoin(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AudienceSocket,
     @MessageBody() body: { code?: string },
   ): Promise<{ ok: boolean; message?: string }> {
     if (!body?.code) {
@@ -45,6 +61,16 @@ export class AudienceGateway {
     }
 
     await client.join(`topic:${topic.id}`);
+    client.data.topicId = topic.id;
+    this.wordCloudGateway.broadcastJoinedCount(topic.id, this.joinedCount(topic.id));
     return { ok: true };
+  }
+
+  handleDisconnect(client: AudienceSocket): void {
+    const topicId = client.data.topicId;
+    if (!topicId) return;
+    // Socket.IO has already removed this socket from its rooms by the time
+    // `disconnect` fires, so joinedCount() already reflects the post-leave count.
+    this.wordCloudGateway.broadcastJoinedCount(topicId, this.joinedCount(topicId));
   }
 }

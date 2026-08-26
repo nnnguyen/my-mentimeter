@@ -23,7 +23,7 @@ describe('WordCloudGateway', () => {
   let wordCloudService: { getSnapshot: jest.Mock };
   let presenterServer: ReturnType<typeof fakeServer>;
   let audienceServer: ReturnType<typeof fakeServer>;
-  let audienceGateway: { server: ReturnType<typeof fakeServer> };
+  let audienceGateway: { server: ReturnType<typeof fakeServer>; joinedCount: jest.Mock };
   let gateway: WordCloudGateway;
 
   const user = { id: 'user-1', email: 'a@example.com', name: 'A' };
@@ -54,6 +54,7 @@ describe('WordCloudGateway', () => {
     words: [{ displayText: 'hello', count: 2 }],
     totalResponses: 2,
     uniqueWords: 1,
+    uniqueParticipants: 2,
   };
 
   beforeEach(() => {
@@ -62,7 +63,7 @@ describe('WordCloudGateway', () => {
     wordCloudService = { getSnapshot: jest.fn() };
     presenterServer = fakeServer();
     audienceServer = fakeServer();
-    audienceGateway = { server: audienceServer };
+    audienceGateway = { server: audienceServer, joinedCount: jest.fn().mockReturnValue(0) };
     gateway = new WordCloudGateway(
       jwtService as never,
       prisma as never,
@@ -151,6 +152,18 @@ describe('WordCloudGateway', () => {
 
       expect(client.join).toHaveBeenCalledWith('topic:topic-1');
     });
+
+    it('returns the current audience joined count so a reconnecting presenter is never stale', async () => {
+      const client = fakeSocket();
+      client.data.user = user;
+      prisma.topic.findUnique.mockResolvedValue(topic);
+      audienceGateway.joinedCount.mockReturnValue(3);
+
+      const result = await gateway.handleJoin(client as never, { topicId: 'topic-1' });
+
+      expect(audienceGateway.joinedCount).toHaveBeenCalledWith('topic-1');
+      expect(result).toEqual({ ok: true, joinedCount: 3 });
+    });
   });
 
   describe('broadcastSnapshot', () => {
@@ -173,7 +186,11 @@ describe('WordCloudGateway', () => {
 
       await gateway.broadcastSnapshot('topic-1', question.id);
 
-      const hiddenPayload = { totalResponses: snapshot.totalResponses, questionId: question.id };
+      const hiddenPayload = {
+        totalResponses: snapshot.totalResponses,
+        uniqueParticipants: snapshot.uniqueParticipants,
+        questionId: question.id,
+      };
       expect(presenterServer.emit).toHaveBeenCalledWith('wordcloud:update', hiddenPayload);
     });
 
@@ -189,6 +206,7 @@ describe('WordCloudGateway', () => {
 
       expect(presenterServer.emit).toHaveBeenCalledWith('wordcloud:update', {
         totalResponses: snapshot.totalResponses,
+        uniqueParticipants: snapshot.uniqueParticipants,
         questionId: question.id,
       });
     });
@@ -219,6 +237,16 @@ describe('WordCloudGateway', () => {
       const expectedPayload = { ...snapshot, questionId: question.id };
       expect(presenterServer.emit).toHaveBeenCalledWith('results:revealed', expectedPayload);
       expect(audienceServer.emit).toHaveBeenCalledWith('results:revealed', expectedPayload);
+    });
+  });
+
+  describe('broadcastJoinedCount', () => {
+    it('emits participants:joined with the count to the presenter namespace only', () => {
+      gateway.broadcastJoinedCount('topic-1', 4);
+
+      expect(presenterServer.to).toHaveBeenCalledWith('topic:topic-1');
+      expect(presenterServer.emit).toHaveBeenCalledWith('participants:joined', { count: 4 });
+      expect(audienceServer.emit).not.toHaveBeenCalled();
     });
   });
 

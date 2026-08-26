@@ -14,12 +14,14 @@ interface WordCloudUpdate {
   words: { displayText: string; count: number }[];
   totalResponses: number;
   uniqueWords: number;
+  uniqueParticipants: number;
   questionId: string;
 }
 
 interface JoinAck {
   ok: boolean;
   message?: string;
+  joinedCount?: number;
 }
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 5000): Promise<T> {
@@ -123,7 +125,7 @@ describe('WordCloudGateway (e2e)', () => {
     try {
       await waitForEvent(socket, 'connect');
       const joinAck = (await socket.emitWithAck('join', { topicId: topic.id })) as JoinAck;
-      expect(joinAck).toEqual({ ok: true });
+      expect(joinAck).toEqual({ ok: true, joinedCount: 0 });
 
       const updatePromise = waitForEvent<WordCloudUpdate>(socket, 'wordcloud:update');
 
@@ -136,6 +138,7 @@ describe('WordCloudGateway (e2e)', () => {
       expect(payload.questionId).toBe(question.id);
       expect(payload.totalResponses).toBe(1);
       expect(payload.uniqueWords).toBe(1);
+      expect(payload.uniqueParticipants).toBe(1);
       expect(payload.words).toEqual([{ displayText: 'realtime', count: 1 }]);
     } finally {
       socket.disconnect();
@@ -203,6 +206,41 @@ describe('WordCloudGateway (e2e)', () => {
     }
   });
 
+  it('broadcasts participants:joined to the presenter as audience devices join and leave', async () => {
+    const presenterSocket = io(`${baseUrl}/presenter`, {
+      extraHeaders: { Cookie: cookieFor(owner) },
+      transports: ['websocket'],
+    });
+    let audienceSocketA: Socket | undefined;
+    let audienceSocketB: Socket | undefined;
+
+    try {
+      await waitForEvent(presenterSocket, 'connect');
+      await presenterSocket.emitWithAck('join', { topicId: topic.id });
+
+      const firstJoined = waitForEvent<{ count: number }>(presenterSocket, 'participants:joined');
+      audienceSocketA = io(`${baseUrl}/audience`, { transports: ['websocket'] });
+      await waitForEvent(audienceSocketA, 'connect');
+      await audienceSocketA.emitWithAck('join', { code: topic.code });
+      expect(await firstJoined).toEqual({ count: 1 });
+
+      const secondJoined = waitForEvent<{ count: number }>(presenterSocket, 'participants:joined');
+      audienceSocketB = io(`${baseUrl}/audience`, { transports: ['websocket'] });
+      await waitForEvent(audienceSocketB, 'connect');
+      await audienceSocketB.emitWithAck('join', { code: topic.code });
+      expect(await secondJoined).toEqual({ count: 2 });
+
+      const afterLeave = waitForEvent<{ count: number }>(presenterSocket, 'participants:joined');
+      audienceSocketB.disconnect();
+      audienceSocketB = undefined;
+      expect(await afterLeave).toEqual({ count: 1 });
+    } finally {
+      presenterSocket.disconnect();
+      audienceSocketA?.disconnect();
+      audienceSocketB?.disconnect();
+    }
+  });
+
   it('rejects an audience join with an unknown code', async () => {
     const socket = io(`${baseUrl}/audience`, { transports: ['websocket'] });
     try {
@@ -241,9 +279,17 @@ describe('WordCloudGateway (e2e)', () => {
         presenterGated,
         audienceGated,
       ]);
-      expect(presenterGatedPayload).toEqual({ totalResponses: 1, questionId: onClickQuestion.id });
+      expect(presenterGatedPayload).toEqual({
+        totalResponses: 1,
+        uniqueParticipants: 1,
+        questionId: onClickQuestion.id,
+      });
       expect(presenterGatedPayload.words).toBeUndefined();
-      expect(audienceGatedPayload).toEqual({ totalResponses: 1, questionId: onClickQuestion.id });
+      expect(audienceGatedPayload).toEqual({
+        totalResponses: 1,
+        uniqueParticipants: 1,
+        questionId: onClickQuestion.id,
+      });
 
       const presenterRevealed = waitForEvent<WordCloudUpdate>(presenterSocket, 'results:revealed');
       const audienceRevealed = waitForEvent<WordCloudUpdate>(audienceSocket, 'results:revealed');

@@ -6,9 +6,9 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { forwardRef, Inject, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { Server, Socket } from 'socket.io';
+import type { Namespace, Socket } from 'socket.io';
 import { Question } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth.constants';
@@ -51,7 +51,7 @@ interface QuestionChangedPayload {
 })
 export class WordCloudGateway implements OnGatewayConnection {
   @WebSocketServer()
-  server: Server;
+  server: Namespace;
 
   private readonly logger = new Logger(WordCloudGateway.name);
 
@@ -59,6 +59,7 @@ export class WordCloudGateway implements OnGatewayConnection {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly wordCloudService: WordCloudService,
+    @Inject(forwardRef(() => AudienceGateway))
     private readonly audienceGateway: AudienceGateway,
   ) {}
 
@@ -82,7 +83,7 @@ export class WordCloudGateway implements OnGatewayConnection {
   async handleJoin(
     @ConnectedSocket() client: PresenterSocket,
     @MessageBody() body: { topicId?: string },
-  ): Promise<{ ok: boolean; message?: string }> {
+  ): Promise<{ ok: boolean; message?: string; joinedCount?: number }> {
     const user = client.data.user;
     if (!user || !body?.topicId) {
       client.disconnect();
@@ -95,7 +96,11 @@ export class WordCloudGateway implements OnGatewayConnection {
       return { ok: false, message };
     }
     await client.join(`topic:${body.topicId}`);
-    return { ok: true };
+    // The presenter's socket reconnects on every question change (see
+    // present/page.tsx), so it must learn the CURRENT audience count here
+    // rather than only from participants:joined broadcasts, which it would
+    // otherwise miss between reconnects.
+    return { ok: true, joinedCount: this.audienceGateway.joinedCount(body.topicId) };
   }
 
   private isResultHidden(
@@ -117,7 +122,11 @@ export class WordCloudGateway implements OnGatewayConnection {
     ]);
 
     const payload = this.isResultHidden(question)
-      ? { totalResponses: snapshot.totalResponses, questionId }
+      ? {
+          totalResponses: snapshot.totalResponses,
+          uniqueParticipants: snapshot.uniqueParticipants,
+          questionId,
+        }
       : { ...snapshot, questionId };
 
     this.server.to(`topic:${topicId}`).emit('wordcloud:update', payload);
@@ -132,6 +141,11 @@ export class WordCloudGateway implements OnGatewayConnection {
     this.server.to(`topic:${topicId}`).emit('results:revealed', payload);
     this.audienceGateway.server.to(`topic:${topicId}`).emit('results:revealed', payload);
     this.logger.debug(`Broadcast results:revealed to topic:${topicId} for question:${questionId}`);
+  }
+
+  broadcastJoinedCount(topicId: string, count: number): void {
+    this.server.to(`topic:${topicId}`).emit('participants:joined', { count });
+    this.logger.debug(`Broadcast participants:joined (${count}) to topic:${topicId}`);
   }
 
   broadcastQuestionChanged(topicId: string, question: Question): void {
