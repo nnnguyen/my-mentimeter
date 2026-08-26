@@ -13,6 +13,8 @@ export interface WordCloudWord {
 interface PositionedWord extends CloudWord {
   text: string;
   size: number;
+  count: number;
+  fontWeight: number;
   x: number;
   y: number;
   rotate: number;
@@ -22,12 +24,23 @@ const WIDTH = 900;
 const HEIGHT = 500;
 const MIN_FONT_SIZE = 16;
 const MAX_FONT_SIZE = 60;
+const MIN_FONT_WEIGHT = 400;
+const MAX_FONT_WEIGHT = 800;
 const DEFAULT_COLORS = ['#1677ff', '#722ed1', '#13a8a8', '#eb2f96', '#fa8c16', '#52c41a'];
 
-function fontSizeFor(count: number, minCount: number, maxCount: number): number {
-  if (maxCount === minCount) return (MIN_FONT_SIZE + MAX_FONT_SIZE) / 2;
-  const ratio = (count - minCount) / (maxCount - minCount);
+function ratioFor(count: number, minCount: number, maxCount: number): number {
+  if (maxCount === minCount) return 0.5;
+  return (count - minCount) / (maxCount - minCount);
+}
+
+function fontSizeFor(ratio: number): number {
   return MIN_FONT_SIZE + ratio * (MAX_FONT_SIZE - MIN_FONT_SIZE);
+}
+
+// Words with more responses render bolder, not just bigger — rounded to the
+// nearest 100 to stay on standard CSS font-weight steps.
+function fontWeightFor(ratio: number): number {
+  return Math.round((MIN_FONT_WEIGHT + ratio * (MAX_FONT_WEIGHT - MIN_FONT_WEIGHT)) / 100) * 100;
 }
 
 export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloudWord[]; colors?: string[] }) {
@@ -47,10 +60,15 @@ export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloud
     const layout = cloud()
       .size([WIDTH, HEIGHT])
       .words(
-        words.map((w) => ({
-          text: w.displayText,
-          size: fontSizeFor(w.count, minCount, maxCount),
-        })),
+        words.map((w) => {
+          const ratio = ratioFor(w.count, minCount, maxCount);
+          return {
+            text: w.displayText,
+            count: w.count,
+            size: fontSizeFor(ratio),
+            fontWeight: fontWeightFor(ratio),
+          };
+        }),
       )
       .padding(2)
       .rotate(0)
@@ -90,6 +108,7 @@ export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloud
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
               style={{
                 fontSize: w.size,
+                fontWeight: w.fontWeight,
                 fontFamily: 'sans-serif',
                 fill: colors[i % colors.length],
               }}

@@ -358,7 +358,7 @@ export default function TopicPresentPage() {
           flexShrink: 0,
         }}
       >
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/dashboard')}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`/topics/${topic.id}/edit`)}>
           Quay lại
         </Button>
 

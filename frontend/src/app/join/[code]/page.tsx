@@ -208,14 +208,14 @@ export default function JoinPage() {
       <Card style={{ width: '100%', maxWidth: 420 }}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           <div>
-            <Title level={4} style={{ marginBottom: 4 }}>
-              {topic.topicTitle}
-            </Title>
             {question && (
-              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              <Title level={4} style={{ marginBottom: 4 }}>
                 {question.prompt}
-              </Paragraph>
+              </Title>
             )}
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              {topic.topicTitle}
+            </Paragraph>
           </div>
 
           {!question && (
