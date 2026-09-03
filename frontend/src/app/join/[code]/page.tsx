@@ -235,7 +235,7 @@ export default function JoinPage() {
             <>
               <Input
                 size="large"
-                placeholder="Nhập một từ..."
+                placeholder="Nhập câu trả lời"
                 value={text}
                 maxLength={question.config.maxWordLength}
                 disabled={disabled || submitting}

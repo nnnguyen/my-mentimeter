@@ -60,6 +60,29 @@ function useIsCompact(breakpoint: number): boolean {
   return isCompact;
 }
 
+function getContrastColor(hexColor: string): string {
+  // Remove hash if present
+  const color = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
+
+  // Handle shorthand hex like #000
+  let r, g, b;
+  if (color.length === 3) {
+    r = parseInt(color[0] + color[0], 16);
+    g = parseInt(color[1] + color[1], 16);
+    b = parseInt(color[2] + color[2], 16);
+  } else {
+    r = parseInt(color.substring(0, 2), 16);
+    g = parseInt(color.substring(2, 4), 16);
+    b = parseInt(color.substring(4, 6), 16);
+  }
+
+  // Calculate luminance - using relative luminance formula
+  // 0.2126 * R + 0.7152 * G + 0.0722 * B
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
+
 export default function TopicEditPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -296,6 +319,16 @@ export default function TopicEditPage() {
     ? TEXT_COLOR_SCHEMES[selectedQuestion.textColorScheme] ?? TEXT_COLOR_SCHEMES[DEFAULT_TEXT_COLOR_SCHEME]
     : TEXT_COLOR_SCHEMES[DEFAULT_TEXT_COLOR_SCHEME];
 
+  const questionTextColor = selectedQuestion?.questionColor
+    ? selectedQuestion.questionColor
+    : selectedQuestion?.backgroundColor
+      ? getContrastColor(selectedQuestion.backgroundColor)
+      : undefined;
+  const secondaryTextColor =
+    questionTextColor === '#FFFFFF' || questionTextColor?.toLowerCase() === '#ffffff'
+      ? 'rgba(255, 255, 255, 0.65)'
+      : undefined;
+
   const panelContent = selectedQuestion ? (
     <QuestionEditPanel
       question={selectedQuestion}
@@ -404,6 +437,7 @@ export default function TopicEditPage() {
                 width: '100%',
                 maxWidth: 640,
                 backgroundColor: selectedQuestion.backgroundColor,
+                color: questionTextColor,
                 borderRadius: 12,
                 padding: 24,
                 position: 'relative',
@@ -419,8 +453,8 @@ export default function TopicEditPage() {
                     right: 16,
                     fontSize: 12,
                     fontWeight: 600,
-                    color: '#8c8c8c',
-                    border: '1px solid #d9d9d9',
+                    color: secondaryTextColor || '#8c8c8c',
+                    border: `1px solid ${secondaryTextColor || '#d9d9d9'}`,
                     borderRadius: 4,
                     padding: '2px 8px',
                   }}
@@ -435,7 +469,7 @@ export default function TopicEditPage() {
                   onChange: (value) => handleFieldChange(selectedQuestion.id, { prompt: value }),
                   triggerType: ['text'],
                 }}
-                style={{ marginTop: 8 }}
+                style={{ marginTop: 8, color: 'inherit' }}
               >
                 {selectedQuestion.prompt || 'Nhập câu hỏi Word Cloud của bạn'}
               </Title>

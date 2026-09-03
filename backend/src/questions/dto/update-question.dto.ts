@@ -51,6 +51,10 @@ export class UpdateQuestionDto {
 
   @IsOptional()
   @IsString()
+  questionColor?: string | null;
+
+  @IsOptional()
+  @IsString()
   @IsNotEmpty()
   textColorScheme?: string;
 

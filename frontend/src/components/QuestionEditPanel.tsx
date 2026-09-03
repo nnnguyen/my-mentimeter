@@ -158,6 +158,21 @@ export function QuestionEditPanel({
             onChange={(color) => change({ backgroundColor: color.toHexString() })}
           />
         </Row>
+        <Row label="Màu chữ câu hỏi">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ColorPicker
+              value={question.questionColor || '#000000'}
+              disabled={!question.questionColor}
+              onChange={(color) => change({ questionColor: color.toHexString() })}
+            />
+            <Switch
+              size="small"
+              checked={!!question.questionColor}
+              onChange={(checked) => change({ questionColor: checked ? '#000000' : null })}
+            />
+            <Text style={{ fontSize: 12 }}>{question.questionColor ? 'Tùy chỉnh' : 'Tự động'}</Text>
+          </div>
+        </Row>
         <Row label="Bảng màu chữ">
           <Select
             value={question.textColorScheme}
