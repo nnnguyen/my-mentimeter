@@ -84,6 +84,7 @@ model Question {
 
   // --- Design ---
   backgroundColor   String  @default("#FFFFFF")
+  questionColor     String? // null = tự động chọn tương phản với backgroundColor
   textColorScheme   String  @default("default") // tên bảng màu chữ dùng cho word cloud
   showLogo          Boolean @default(true)
   maxWordsDisplayed Int     @default(50) // số từ hiển thị tối đa trên word cloud

@@ -71,6 +71,29 @@ function isResultHidden(question: Pick<Question, 'resultVisibility' | 'resultsRe
   return question.resultVisibility === 'ON_CLICK' && !question.resultsRevealed;
 }
 
+function getContrastColor(hexColor: string): string {
+  // Remove hash if present
+  const color = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
+
+  // Handle shorthand hex like #000
+  let r, g, b;
+  if (color.length === 3) {
+    r = parseInt(color[0] + color[0], 16);
+    g = parseInt(color[1] + color[1], 16);
+    b = parseInt(color[2] + color[2], 16);
+  } else {
+    r = parseInt(color.substring(0, 2), 16);
+    g = parseInt(color.substring(2, 4), 16);
+    b = parseInt(color.substring(4, 6), 16);
+  }
+
+  // Calculate luminance - using relative luminance formula
+  // 0.2126 * R + 0.7152 * G + 0.0722 * B
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
+
 export default function TopicPresentPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -336,6 +359,16 @@ export default function TopicPresentPage() {
     ? TEXT_COLOR_SCHEMES[currentQuestion.textColorScheme] ?? TEXT_COLOR_SCHEMES[DEFAULT_TEXT_COLOR_SCHEME]
     : TEXT_COLOR_SCHEMES[DEFAULT_TEXT_COLOR_SCHEME];
 
+  const questionTextColor = currentQuestion?.questionColor
+    ? currentQuestion.questionColor
+    : currentQuestion?.backgroundColor
+      ? getContrastColor(currentQuestion.backgroundColor)
+      : undefined;
+  const secondaryTextColor =
+    questionTextColor === '#FFFFFF' || questionTextColor?.toLowerCase() === '#ffffff'
+      ? 'rgba(255, 255, 255, 0.65)'
+      : undefined;
+
   return (
     <main
       style={{
@@ -346,6 +379,7 @@ export default function TopicPresentPage() {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: currentQuestion?.backgroundColor || '#FFFFFF',
+        color: questionTextColor,
       }}
     >
       {/* Top bar */}
@@ -409,10 +443,10 @@ export default function TopicPresentPage() {
             <div style={{ textAlign: 'center', maxWidth: '70%' }}>
               {currentQuestion && (
                 <>
-                  <Title level={2} style={{ margin: 0 }}>
+                  <Title level={2} style={{ margin: 0, color: 'inherit' }}>
                     {currentQuestion.prompt}
                   </Title>
-                  <Text type="secondary">
+                  <Text style={{ color: secondaryTextColor || 'rgba(0, 0, 0, 0.45)' }}>
                     Câu {currentIndex + 1}/{questions.length} ·{' '}
                     {currentQuestion.responseLimit !== null
                       ? `Giới hạn: ${currentQuestion.responseLimit} từ/người`
@@ -421,12 +455,16 @@ export default function TopicPresentPage() {
                   <div style={{ marginTop: 8 }}>
                     <Space size="large">
                       <Space size="small">
-                        <UserOutlined />
-                        <Text type="secondary">{joinedCount} người đã join</Text>
+                        <UserOutlined style={{ color: secondaryTextColor }} />
+                        <Text style={{ color: secondaryTextColor || 'rgba(0, 0, 0, 0.45)' }}>
+                          {joinedCount} người đã join
+                        </Text>
                       </Space>
                       <Space size="small">
-                        <TeamOutlined />
-                        <Text type="secondary">{wordCloud.uniqueParticipants} người đã trả lời</Text>
+                        <TeamOutlined style={{ color: secondaryTextColor }} />
+                        <Text style={{ color: secondaryTextColor || 'rgba(0, 0, 0, 0.45)' }}>
+                          {wordCloud.uniqueParticipants} người đã trả lời
+                        </Text>
                       </Space>
                     </Space>
                   </div>
@@ -454,20 +492,30 @@ export default function TopicPresentPage() {
           >
             {hidden ? (
               <Space direction="vertical" align="center">
-                <Statistic title="Tổng câu trả lời" value={wordCloud.totalResponses} />
+                <Statistic
+                  title={<Text style={{ color: secondaryTextColor }}>Tổng câu trả lời</Text>}
+                  value={wordCloud.totalResponses}
+                  valueStyle={{ color: 'inherit' }}
+                />
                 {currentQuestion?.resultVisibility === 'PRIVATE' && (
-                  <Text type="secondary">Kết quả ở chế độ riêng tư, không hiện trên màn hình chiếu.</Text>
+                  <Text style={{ color: secondaryTextColor || 'rgba(0, 0, 0, 0.45)' }}>
+                    Kết quả ở chế độ riêng tư, không hiện trên màn hình chiếu.
+                  </Text>
                 )}
                 {currentQuestion?.resultVisibility === 'ON_CLICK' && (
-                  <Text type="secondary">Bấm &quot;Thống kê&quot; để hiện kết quả.</Text>
+                  <Text style={{ color: secondaryTextColor || 'rgba(0, 0, 0, 0.45)' }}>
+                    Bấm &quot;Thống kê&quot; để hiện kết quả.
+                  </Text>
                 )}
               </Space>
             ) : previewWords.length > 0 ? (
-              <div style={{ width: '100%', maxWidth: 1000 }}>
+              <div style={{ width: '100%', maxWidth: 1200 }}>
                 <WordCloud words={previewWords} colors={previewColors} />
               </div>
             ) : (
-              <Text type="secondary">Chưa có câu trả lời nào.</Text>
+              <Text style={{ color: secondaryTextColor || 'rgba(0, 0, 0, 0.45)' }}>
+                Chưa có câu trả lời nào.
+              </Text>
             )}
           </div>
         </>

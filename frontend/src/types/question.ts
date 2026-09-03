@@ -13,6 +13,7 @@ export interface Question {
   maxWordLength: number;
   allowDuplicateFromSameUser: boolean;
   backgroundColor: string;
+  questionColor: string | null;
   textColorScheme: string;
   showLogo: boolean;
   maxWordsDisplayed: number;
@@ -33,6 +34,7 @@ export type QuestionPatch = Partial<
     | 'maxWordLength'
     | 'allowDuplicateFromSameUser'
     | 'backgroundColor'
+    | 'questionColor'
     | 'textColorScheme'
     | 'showLogo'
     | 'maxWordsDisplayed'
