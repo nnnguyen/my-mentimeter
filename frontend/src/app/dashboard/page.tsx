@@ -18,7 +18,15 @@ import {
   Typography,
   message,
 } from 'antd';
-import { EditOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  CheckOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
+  LockOutlined,
+  PlusOutlined,
+  UnlockOutlined,
+} from '@ant-design/icons';
 import { apiFetch } from '@/lib/api';
 
 const { Header, Content } = Layout;
@@ -47,8 +55,8 @@ const STATUS_COLOR: Record<Topic['status'], string> = {
 };
 const STATUS_LABEL: Record<Topic['status'], string> = {
   DRAFT: 'Nháp',
-  ACTIVE: 'Đang mở',
-  CLOSED: 'Đã đóng',
+  ACTIVE: 'Đang kích hoạt',
+  CLOSED: 'Đã khóa',
 };
 
 export default function DashboardPage() {
@@ -145,7 +153,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error('update failed');
       const updated: Topic = await res.json();
       setTopics((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      message.success(nextStatus === 'ACTIVE' ? 'Đã mở lại topic' : 'Đã đóng topic');
+      message.success(nextStatus === 'ACTIVE' ? 'Đã kích hoạt topic' : 'Đã khóa topic');
     } catch {
       message.error('Cập nhật trạng thái thất bại');
     } finally {
@@ -229,32 +237,46 @@ export default function DashboardPage() {
                 title: 'Hành động',
                 render: (_: unknown, record: Topic) => (
                   <Space>
-                    <Button size="small" onClick={() => router.push(`/topics/${record.id}/edit`)}>
-                      Mở
-                    </Button>
-                    <Button size="small" icon={<EditOutlined />} onClick={() => openEditModal(record)}>
-                      Sửa
-                    </Button>
+                    <Button
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={() => router.push(`/topics/${record.id}/edit`)}
+                      title="Xem câu hỏi"
+                    />
+                    <Button
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => openEditModal(record)}
+                      title="Sửa"
+                    />
                     <Button
                       size="small"
                       loading={updatingStatusId === record.id}
                       onClick={() => handleToggleStatus(record)}
-                    >
-                      {record.status === 'ACTIVE'
-                        ? 'Đóng'
-                        : record.status === 'CLOSED'
-                          ? 'Mở lại'
-                          : 'Mở'}
-                    </Button>
+                      icon={
+                        record.status === 'ACTIVE' ? (
+                          <LockOutlined />
+                        ) : record.status === 'CLOSED' ? (
+                          <UnlockOutlined />
+                        ) : (
+                          <CheckOutlined />
+                        )
+                      }
+                      title={
+                        record.status === 'ACTIVE'
+                          ? 'Khóa'
+                          : record.status === 'CLOSED'
+                            ? 'Kích hoạt lại'
+                            : 'Kích hoạt'
+                      }
+                    />
                     <Popconfirm
                       title="Xoá topic này?"
                       onConfirm={() => handleDelete(record.id)}
                       okText="Xoá"
                       cancelText="Huỷ"
                     >
-                      <Button size="small" danger>
-                        Xoá
-                      </Button>
+                      <Button size="small" danger icon={<DeleteOutlined />} title="Xoá" />
                     </Popconfirm>
                   </Space>
                 ),

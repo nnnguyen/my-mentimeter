@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, Drawer, Empty, Popover, Select, Spin, Typography, message } from 'antd';
+import { Button, Drawer, Empty, Modal, Popover, Select, Space, Spin, Statistic, Tabs, Typography, message } from 'antd';
 import {
   ArrowLeftOutlined,
   PlayCircleOutlined,
@@ -12,7 +12,9 @@ import {
 import { apiFetch } from '@/lib/api';
 import { createAutosaveController } from '@/lib/autosave';
 import { getContrastColor, getContrastingPalette } from '@/lib/text-color-schemes';
-import { WordCloud } from '@/components/WordCloud';
+import { WordCloud, type WordCloudWord } from '@/components/WordCloud';
+import { WordStatsTable } from '@/components/WordStatsTable';
+import { StatsVisualizer } from '@/components/StatsVisualizer';
 import { QuestionSidebar } from '@/components/QuestionSidebar';
 import {
   QuestionEditPanel,
@@ -71,6 +73,9 @@ export default function TopicEditPage() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ status: 'idle', lastSavedAt: null });
+  const [realtimeStats, setRealtimeStats] = useState<Record<string, any>>({});
+  const [statsModalVisible, setStatsModalVisible] = useState(false);
+  const [statsQuestionId, setStatsQuestionId] = useState<string | null>(null);
 
   const isCompact = useIsCompact(COMPACT_BREAKPOINT);
 
@@ -109,6 +114,16 @@ export default function TopicEditPage() {
     if (!res.ok) return [];
     const data: Question[] = await res.json();
     setQuestions(data);
+
+    // Fetch stats for each question to show real word cloud in preview
+    data.forEach(async (q) => {
+      const statsRes = await apiFetch(`/api/questions/${q.id}/wordcloud`);
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        setRealtimeStats((prev) => ({ ...prev, [q.id]: stats }));
+      }
+    });
+
     return data;
   }, []);
 
@@ -289,13 +304,19 @@ export default function TopicEditPage() {
     return null;
   }
 
-  const previewWords = selectedQuestion
-    ? SAMPLE_WORDS.slice(0, selectedQuestion.maxWordsDisplayed)
-    : [];
+  const previewWords =
+    selectedQuestion && realtimeStats[selectedQuestion.id]?.words?.length > 0
+      ? realtimeStats[selectedQuestion.id].words.slice(0, selectedQuestion.maxWordsDisplayed)
+      : selectedQuestion
+        ? SAMPLE_WORDS.slice(0, selectedQuestion.maxWordsDisplayed)
+        : [];
   const previewColors = getContrastingPalette(
     selectedQuestion?.textColorScheme ?? DEFAULT_TEXT_COLOR_SCHEME,
     selectedQuestion?.backgroundColor ?? '#FFFFFF',
   );
+
+  const statsQuestion = questions.find((q) => q.id === statsQuestionId);
+  const statsData = statsQuestionId ? realtimeStats[statsQuestionId] : null;
 
   const questionTextColor = selectedQuestion?.questionColor
     ? selectedQuestion.questionColor
@@ -376,6 +397,10 @@ export default function TopicEditPage() {
               onDuplicate={handleDuplicateQuestion}
               onDelete={handleDeleteQuestion}
               onReorder={handleReorder}
+              onShowStats={(qId) => {
+                setStatsQuestionId(qId);
+                setStatsModalVisible(true);
+              }}
             />
           </div>
         )}
@@ -508,6 +533,60 @@ export default function TopicEditPage() {
           </Drawer>
         )}
       </div>
+
+      {/* Stats Modal */}
+      <Modal
+        title={statsQuestion ? `Thống kê: ${statsQuestion.prompt || 'Câu hỏi'}` : 'Thống kê kết quả'}
+        open={statsModalVisible}
+        onCancel={() => setStatsModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        {statsData ? (
+          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+            <Space size="large">
+              <Statistic title="Tổng câu trả lời" value={statsData.totalResponses || 0} />
+              <Statistic title="Người tham gia" value={statsData.uniqueParticipants || 0} />
+              <Statistic title="Số từ khác nhau" value={statsData.uniqueWords || 0} />
+            </Space>
+
+            {statsData.words && statsData.words.length > 0 ? (
+              <Tabs
+                defaultActiveKey="table"
+                items={[
+                  {
+                    key: 'table',
+                    label: 'Dạng bảng',
+                    children: (
+                      <WordStatsTable
+                        words={statsData.words}
+                        totalResponses={statsData.totalResponses || 0}
+                        filename={`wordcloud-${topic.code}.csv`}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'bar',
+                    label: 'Biểu đồ cột',
+                    children: <StatsVisualizer words={statsData.words} type="bar" />,
+                  },
+                  {
+                    key: 'pie',
+                    label: 'Biểu đồ tròn',
+                    children: <StatsVisualizer words={statsData.words} type="pie" />,
+                  },
+                ]}
+              />
+            ) : (
+              <Empty description="Chưa có câu trả lời nào" />
+            )}
+          </Space>
+        ) : (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <Spin tip="Đang tải dữ liệu..." />
+          </div>
+        )}
+      </Modal>
     </main>
   );
 }

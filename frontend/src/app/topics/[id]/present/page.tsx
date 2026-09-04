@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, Modal, Space, Spin, Statistic, Tag, Typography, message } from 'antd';
+import { Button, Modal, Space, Spin, Statistic, Tabs, Tag, Typography, message } from 'antd';
 import {
   ArrowLeftOutlined,
   BarChartOutlined,
@@ -19,6 +19,7 @@ import { io, Socket } from 'socket.io-client';
 import { apiFetch, API_BASE_URL } from '@/lib/api';
 import { WordCloud, WordCloudWord } from '@/components/WordCloud';
 import { WordStatsTable } from '@/components/WordStatsTable';
+import { StatsVisualizer } from '@/components/StatsVisualizer';
 import { DEFAULT_TEXT_COLOR_SCHEME, getContrastColor, getContrastingPalette } from '@/lib/text-color-schemes';
 import type { Question } from '@/types/question';
 
@@ -469,7 +470,7 @@ export default function TopicPresentPage() {
             }}
           >
             {hidden ? (
-              <Space direction="vertical" align="center">
+              <Space orientation="vertical" align="center">
                 <Statistic
                   title={<Text style={{ color: secondaryTextColor }}>Tổng câu trả lời</Text>}
                   value={wordCloud.totalResponses}
@@ -541,7 +542,7 @@ export default function TopicPresentPage() {
         ) : (
           <Spin />
         )}
-        <Space direction="vertical" align="center" style={{ width: '100%' }}>
+        <Space orientation="vertical" align="center" style={{ width: '100%' }}>
           <Button block icon={<CopyOutlined />} onClick={handleCopyLink}>
             Copy link
           </Button>
@@ -562,14 +563,14 @@ export default function TopicPresentPage() {
         open={statsModalOpen}
         onCancel={() => setStatsModalOpen(false)}
         footer={null}
-        width={720}
+        width={800}
       >
         {currentQuestion && (
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
             <Space size="large">
-              <Statistic title="Tổng câu trả lời" value={wordCloud.totalResponses} />
-              <Statistic title="Người tham gia" value={wordCloud.uniqueParticipants} />
-              {!hidden && <Statistic title="Số từ khác nhau" value={wordCloud.uniqueWords} />}
+              <Statistic title="Tổng câu trả lời" value={wordCloud.totalResponses || 0} />
+              <Statistic title="Người tham gia" value={wordCloud.uniqueParticipants || 0} />
+              {!hidden && <Statistic title="Số từ khác nhau" value={wordCloud.uniqueWords || 0} />}
             </Space>
 
             {currentQuestion.resultVisibility === 'ON_CLICK' && !currentQuestion.resultsRevealed && (
@@ -587,12 +588,36 @@ export default function TopicPresentPage() {
               <Text type="secondary">Kết quả ở chế độ riêng tư, không hiện trên màn hình chiếu.</Text>
             )}
 
-            {!hidden && (
-              <WordStatsTable
-                words={wordCloud.words}
-                totalResponses={wordCloud.totalResponses}
-                filename={`wordcloud-${topic.code}.csv`}
+            {!hidden && wordCloud.words && wordCloud.words.length > 0 && (
+              <Tabs
+                defaultActiveKey="table"
+                items={[
+                  {
+                    key: 'table',
+                    label: 'Dạng bảng',
+                    children: (
+                      <WordStatsTable
+                        words={wordCloud.words}
+                        totalResponses={wordCloud.totalResponses || 0}
+                        filename={`wordcloud-${topic.code}.csv`}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'bar',
+                    label: 'Biểu đồ cột',
+                    children: <StatsVisualizer words={wordCloud.words} type="bar" />,
+                  },
+                  {
+                    key: 'pie',
+                    label: 'Biểu đồ tròn',
+                    children: <StatsVisualizer words={wordCloud.words} type="pie" />,
+                  },
+                ]}
               />
+            )}
+            {!hidden && (!wordCloud.words || wordCloud.words.length === 0) && (
+              <Text type="secondary">Chưa có câu trả lời nào.</Text>
             )}
           </Space>
         )}

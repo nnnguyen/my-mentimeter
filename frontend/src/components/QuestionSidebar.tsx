@@ -2,7 +2,7 @@
 
 import { Button, Dropdown, Modal } from 'antd';
 import type { MenuProps } from 'antd';
-import { CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
+import { BarChartOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   DndContext,
   PointerSensor,
@@ -32,6 +32,7 @@ interface QuestionSidebarProps {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  onShowStats?: (id: string) => void;
 }
 
 function SortableItem({
@@ -40,24 +41,28 @@ function SortableItem({
   onSelect,
   onDuplicate,
   onDelete,
+  onShowStats,
 }: {
   question: SidebarQuestion;
   selected: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onShowStats?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: question.id,
   });
 
   const menuItems: MenuProps['items'] = [
+    { key: 'stats', icon: <BarChartOutlined />, label: 'Xem thống kê' },
     { key: 'duplicate', icon: <CopyOutlined />, label: 'Nhân bản' },
     { key: 'delete', icon: <DeleteOutlined />, label: 'Xoá', danger: true },
   ];
 
   const handleMenuClick: MenuProps['onClick'] = ({ key, domEvent }) => {
     domEvent.stopPropagation();
+    if (key === 'stats') onShowStats?.();
     if (key === 'duplicate') onDuplicate();
     if (key === 'delete') {
       Modal.confirm({
@@ -124,6 +129,7 @@ export function QuestionSidebar({
   onDuplicate,
   onDelete,
   onReorder,
+  onShowStats,
 }: QuestionSidebarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -153,6 +159,7 @@ export function QuestionSidebar({
               onSelect={() => onSelect(question.id)}
               onDuplicate={() => onDuplicate(question.id)}
               onDelete={() => onDelete(question.id)}
+              onShowStats={() => onShowStats?.(question.id)}
             />
           ))}
         </SortableContext>

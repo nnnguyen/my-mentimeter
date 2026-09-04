@@ -91,7 +91,7 @@ export class PublicTopicsService {
       throw new NotFoundException('Không tìm thấy câu hỏi.');
     }
     if (question.status !== 'ACTIVE') {
-      throw new ConflictException('Câu hỏi hiện không mở để nhận câu trả lời.');
+      throw new ConflictException('Câu hỏi hiện không được kích hoạt để nhận câu trả lời.');
     }
 
     const existingCount = await this.prisma.response.count({

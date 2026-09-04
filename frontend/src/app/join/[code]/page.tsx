@@ -206,7 +206,7 @@ export default function JoinPage() {
       }}
     >
       <Card style={{ width: '100%', maxWidth: 420 }}>
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <div>
             {question && (
               <Title level={4} style={{ marginBottom: 4 }}>
@@ -219,13 +219,13 @@ export default function JoinPage() {
           </div>
 
           {!question && (
-            <Alert type="info" showIcon message="Chưa có câu hỏi nào đang mở." />
+            <Alert type="info" showIcon message="Chưa có câu hỏi nào được kích hoạt." />
           )}
           {question?.status === 'DRAFT' && (
             <Alert type="warning" showIcon message="Câu hỏi chưa được bắt đầu." />
           )}
           {question?.status === 'CLOSED' && (
-            <Alert type="info" showIcon message="Câu hỏi đã đóng, không nhận thêm câu trả lời." />
+            <Alert type="info" showIcon message="Câu hỏi đã bị khóa, không nhận thêm câu trả lời." />
           )}
           {error && (
             <Alert type="error" showIcon message={error} closable onClose={() => setError(null)} />
