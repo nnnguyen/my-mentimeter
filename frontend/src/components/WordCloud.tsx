@@ -20,10 +20,10 @@ interface PositionedWord extends CloudWord {
   rotate: number;
 }
 
-const WIDTH = 1200;
-const HEIGHT = 600;
-const MIN_FONT_SIZE = 20;
-const MAX_FONT_SIZE = 80;
+const WIDTH = 1600;
+const HEIGHT = 800;
+const MIN_FONT_SIZE = 24;
+const MAX_FONT_SIZE = 120;
 const MIN_FONT_WEIGHT = 400;
 const MAX_FONT_WEIGHT = 800;
 const DEFAULT_COLORS = ['#1677ff', '#722ed1', '#13a8a8', '#eb2f96', '#fa8c16', '#52c41a'];
@@ -39,8 +39,8 @@ function fontSizeFor(ratio: number): number {
 
 // Words with more responses render bolder, not just bigger — rounded to the
 // nearest 100 to stay on standard CSS font-weight steps.
-function fontWeightFor(ratio: number): number {
-  return Math.round((MIN_FONT_WEIGHT + ratio * (MAX_FONT_WEIGHT - MIN_FONT_WEIGHT)) / 100) * 100;
+function fontWeightFor(count: number): number {
+  return count >= 2 ? 700 : 400;
 }
 
 export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloudWord[]; colors?: string[] }) {
@@ -66,11 +66,11 @@ export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloud
             text: w.displayText,
             count: w.count,
             size: fontSizeFor(ratio),
-            fontWeight: fontWeightFor(ratio),
+            fontWeight: fontWeightFor(w.count),
           };
         }),
       )
-      .padding(10)
+      .padding(15)
       .rotate(0)
       .font('sans-serif')
       .fontSize((d) => d.size ?? MIN_FONT_SIZE)

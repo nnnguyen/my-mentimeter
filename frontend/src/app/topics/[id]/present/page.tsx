@@ -19,7 +19,7 @@ import { io, Socket } from 'socket.io-client';
 import { apiFetch, API_BASE_URL } from '@/lib/api';
 import { WordCloud, WordCloudWord } from '@/components/WordCloud';
 import { WordStatsTable } from '@/components/WordStatsTable';
-import { TEXT_COLOR_SCHEMES, DEFAULT_TEXT_COLOR_SCHEME } from '@/lib/text-color-schemes';
+import { DEFAULT_TEXT_COLOR_SCHEME, getContrastColor, getContrastingPalette } from '@/lib/text-color-schemes';
 import type { Question } from '@/types/question';
 
 const { Title, Text } = Typography;
@@ -69,29 +69,6 @@ const QR_PANEL_WIDTH = 500;
 function isResultHidden(question: Pick<Question, 'resultVisibility' | 'resultsRevealed'>): boolean {
   if (question.resultVisibility === 'PRIVATE') return true;
   return question.resultVisibility === 'ON_CLICK' && !question.resultsRevealed;
-}
-
-function getContrastColor(hexColor: string): string {
-  // Remove hash if present
-  const color = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
-
-  // Handle shorthand hex like #000
-  let r, g, b;
-  if (color.length === 3) {
-    r = parseInt(color[0] + color[0], 16);
-    g = parseInt(color[1] + color[1], 16);
-    b = parseInt(color[2] + color[2], 16);
-  } else {
-    r = parseInt(color.substring(0, 2), 16);
-    g = parseInt(color.substring(2, 4), 16);
-    b = parseInt(color.substring(4, 6), 16);
-  }
-
-  // Calculate luminance - using relative luminance formula
-  // 0.2126 * R + 0.7152 * G + 0.0722 * B
-  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-
-  return luminance > 0.5 ? '#000000' : '#FFFFFF';
 }
 
 export default function TopicPresentPage() {
@@ -355,9 +332,10 @@ export default function TopicPresentPage() {
   const previewWords = currentQuestion
     ? wordCloud.words.slice(0, currentQuestion.maxWordsDisplayed)
     : wordCloud.words;
-  const previewColors = currentQuestion
-    ? TEXT_COLOR_SCHEMES[currentQuestion.textColorScheme] ?? TEXT_COLOR_SCHEMES[DEFAULT_TEXT_COLOR_SCHEME]
-    : TEXT_COLOR_SCHEMES[DEFAULT_TEXT_COLOR_SCHEME];
+  const previewColors = getContrastingPalette(
+    currentQuestion?.textColorScheme ?? DEFAULT_TEXT_COLOR_SCHEME,
+    currentQuestion?.backgroundColor ?? '#FFFFFF',
+  );
 
   const questionTextColor = currentQuestion?.questionColor
     ? currentQuestion.questionColor
@@ -509,7 +487,7 @@ export default function TopicPresentPage() {
                 )}
               </Space>
             ) : previewWords.length > 0 ? (
-              <div style={{ width: '100%', maxWidth: 1200 }}>
+              <div style={{ width: '100%', maxWidth: 1600 }}>
                 <WordCloud words={previewWords} colors={previewColors} />
               </div>
             ) : (
