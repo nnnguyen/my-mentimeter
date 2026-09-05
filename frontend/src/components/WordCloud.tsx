@@ -22,7 +22,7 @@ interface PositionedWord extends CloudWord {
 
 const WIDTH = 1600;
 const HEIGHT = 800;
-const MIN_FONT_SIZE = 24;
+const MIN_FONT_SIZE = 40;
 const MAX_FONT_SIZE = 120;
 const MIN_FONT_WEIGHT = 400;
 const MAX_FONT_WEIGHT = 800;
