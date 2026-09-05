@@ -11,7 +11,24 @@ import { WordCloudService, WordCloudSnapshot } from '../word-cloud/word-cloud.se
 import { WordCloudGateway } from '../realtime/word-cloud.gateway';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { ApplySettingsToOthersDto } from './dto/apply-settings-to-others.dto';
 import { ApplySettingsGroup } from './dto/apply-settings-to-all.dto';
+
+const APPLY_SETTINGS_FIELDS: (keyof Question)[] = [
+  'responseLimit',
+  'maxWordLength',
+  'allowDuplicateFromSameUser',
+  'backgroundColor',
+  'questionColor',
+  'textColorScheme',
+  'showLogo',
+  'logoUrl',
+  'maxWordsDisplayed',
+  'showJoiningInfo',
+  'joiningInfoType',
+  'resultVisibility',
+  'showResultsToAudience',
+];
 
 const APPLY_SETTINGS_GROUP_FIELDS: Record<ApplySettingsGroup, (keyof Question)[]> = {
   [ApplySettingsGroup.JOINING]: ['showJoiningInfo', 'joiningInfoType'],
@@ -48,8 +65,27 @@ export class QuestionsService {
   async create(topicId: string, ownerId: string, dto: CreateQuestionDto): Promise<Question> {
     await this.topicsService.findOneForUser(topicId, ownerId);
     const order = await this.nextOrder(topicId);
+
+    // Get the first question of this topic to copy its config
+    const firstQuestion = await this.prisma.question.findFirst({
+      where: { topicId },
+      orderBy: { order: 'asc' },
+    });
+
+    const data: any = {
+      topicId,
+      order,
+      prompt: dto.prompt ?? '',
+    };
+
+    if (firstQuestion) {
+      for (const field of APPLY_SETTINGS_FIELDS) {
+        data[field] = (firstQuestion as any)[field];
+      }
+    }
+
     return this.prisma.question.create({
-      data: { topicId, order, prompt: dto.prompt ?? '' },
+      data,
     });
   }
 
@@ -167,6 +203,34 @@ export class QuestionsService {
 
     const result = await this.prisma.question.updateMany({
       where: { topicId: question.topicId },
+      data,
+    });
+    return { updatedCount: result.count };
+  }
+
+  async applySettingsToOthers(
+    id: string,
+    ownerId: string,
+    dto: ApplySettingsToOthersDto,
+  ): Promise<{ updatedCount: number }> {
+    const question = await this.requireOwnedQuestion(id, ownerId);
+
+    const data: Record<string, unknown> = {};
+    for (const field of APPLY_SETTINGS_FIELDS) {
+      data[field] = (question as any)[field];
+    }
+
+    const where: any = {
+      topicId: question.topicId,
+      id: { not: id },
+    };
+
+    if (!dto.applyToAll && dto.targetQuestionIds) {
+      where.id = { in: dto.targetQuestionIds };
+    }
+
+    const result = await this.prisma.question.updateMany({
+      where,
       data,
     });
     return { updatedCount: result.count };

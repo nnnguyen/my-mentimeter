@@ -373,7 +373,15 @@ export default function TopicPresentPage() {
           minHeight: 120, // Tăng chiều cao tối thiểu để logo không đè content top bar
         }}
       >
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`/topics/${topic.id}/edit`)}>
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => router.push(`/topics/${topic.id}/edit`)}
+          style={{
+            color: questionTextColor,
+            borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+            backgroundColor: 'transparent',
+          }}
+        >
           Quay lại
         </Button>
 
@@ -409,7 +417,15 @@ export default function TopicPresentPage() {
             {CONNECTION_LABEL[connectionStatus].text}
           </Tag>
           {currentQuestion && (
-            <Button icon={<BarChartOutlined />} onClick={() => setStatsModalOpen(true)}>
+            <Button
+              icon={<BarChartOutlined />}
+              onClick={() => setStatsModalOpen(true)}
+              style={{
+                color: questionTextColor,
+                borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+                backgroundColor: 'transparent',
+              }}
+            >
               Thống kê
             </Button>
           )}
@@ -419,6 +435,15 @@ export default function TopicPresentPage() {
               type={qrPanelOpen ? 'primary' : 'default'}
               icon={<QrcodeOutlined />}
               onClick={() => setQrPanelOpen((v) => !v)}
+              style={
+                !qrPanelOpen
+                  ? {
+                      color: questionTextColor,
+                      borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+                      backgroundColor: 'transparent',
+                    }
+                  : undefined
+              }
             />
           )}
         </Space>
@@ -441,13 +466,21 @@ export default function TopicPresentPage() {
               flexShrink: 0,
             }}
           >
-            <Button
-              shape="circle"
-              size="large"
-              icon={<LeftOutlined />}
-              disabled={!prevQuestion || changingQuestion}
-              onClick={() => handleChangeQuestion(prevQuestion)}
-            />
+            {questions.length > 1 && (
+              <Button
+                shape="circle"
+                size="large"
+                icon={<LeftOutlined />}
+                disabled={!prevQuestion || changingQuestion}
+                onClick={() => handleChangeQuestion(prevQuestion)}
+                style={{
+                  color: questionTextColor,
+                  borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+                  backgroundColor: 'transparent',
+                  visibility: !prevQuestion ? 'hidden' : 'visible',
+                }}
+              />
+            )}
             <div style={{ textAlign: 'center', width: '100%', padding: '0 80px' }}>
               {currentQuestion && (
                 <>
@@ -479,13 +512,21 @@ export default function TopicPresentPage() {
                 </>
               )}
             </div>
-            <Button
-              shape="circle"
-              size="large"
-              icon={<RightOutlined />}
-              disabled={!nextQuestion || changingQuestion}
-              onClick={() => handleChangeQuestion(nextQuestion)}
-            />
+            {questions.length > 1 && (
+              <Button
+                shape="circle"
+                size="large"
+                icon={<RightOutlined />}
+                disabled={!nextQuestion || changingQuestion}
+                onClick={() => handleChangeQuestion(nextQuestion)}
+                style={{
+                  color: questionTextColor,
+                  borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+                  backgroundColor: 'transparent',
+                  visibility: !nextQuestion ? 'hidden' : 'visible',
+                }}
+              />
+            )}
           </div>
 
           <div

@@ -208,6 +208,7 @@ export default function TopicEditPage() {
     const created: Question = await res.json();
     setQuestions((prev) => [...prev, created]);
     setSelectedQuestionId(created.id);
+    setPanelOpen(true);
   };
 
   const handleDuplicateQuestion = async (questionId: string) => {
@@ -331,6 +332,7 @@ export default function TopicEditPage() {
   const panelContent = selectedQuestion ? (
     <QuestionEditPanel
       question={selectedQuestion}
+      questions={questions}
       saveStatus={saveStatus}
       onFieldChange={handleFieldChange}
       onApplyToAll={handleApplyToAll}

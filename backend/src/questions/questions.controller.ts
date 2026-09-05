@@ -19,6 +19,7 @@ import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { QuestionsService } from './questions.service';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { ApplySettingsToAllDto } from './dto/apply-settings-to-all.dto';
+import { ApplySettingsToOthersDto } from './dto/apply-settings-to-others.dto';
 
 @Controller('questions')
 @UseGuards(JwtAuthGuard)
@@ -78,6 +79,15 @@ export class QuestionsController {
     @Body() dto: ApplySettingsToAllDto,
   ) {
     return this.questionsService.applySettingsToAll(id, user.id, dto.groups);
+  }
+
+  @Post(':id/apply-settings-to-others')
+  applySettingsToOthers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ApplySettingsToOthersDto,
+  ) {
+    return this.questionsService.applySettingsToOthers(id, user.id, dto);
   }
 
   @Post(':id/reveal-results')

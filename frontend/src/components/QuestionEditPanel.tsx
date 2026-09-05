@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
+  Checkbox,
   ColorPicker,
   Divider,
   InputNumber,
@@ -15,6 +16,7 @@ import {
   Upload,
   message,
 } from 'antd';
+import { apiFetch } from '@/lib/api';
 import { CloseOutlined, LoadingOutlined, PlusOutlined } from '@ant-design/icons';
 import { TEXT_COLOR_SCHEME_OPTIONS } from '@/lib/text-color-schemes';
 import {
@@ -35,6 +37,7 @@ export interface SaveStatus {
 
 interface QuestionEditPanelProps {
   question: Question;
+  questions: Question[];
   saveStatus: SaveStatus;
   onFieldChange: (questionId: string, patch: QuestionPatch) => void;
   onApplyToAll: (group: ApplyToAllGroup) => void;
@@ -69,14 +72,27 @@ function formatSavedAt(date: Date): string {
 
 export function QuestionEditPanel({
   question,
+  questions,
   saveStatus,
   onFieldChange,
   onApplyToAll,
   onClose,
 }: QuestionEditPanelProps) {
   const [uploading, setUploading] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [applyToAll, setApplyToAllLocal] = useState(false);
+  const [targetIds, setTargetIds] = useState<string[]>([]);
+  const [applying, setApplying] = useState(false);
+
   const questionId = question.id;
-  const change = (patch: QuestionPatch) => onFieldChange(questionId, patch);
+  const change = (patch: QuestionPatch) => {
+    onFieldChange(questionId, patch);
+    setHasChanges(true);
+  };
+
+  useEffect(() => {
+    setHasChanges(false);
+  }, [question.id]);
 
   const saveStatusText =
     saveStatus.status === 'saving'
@@ -291,6 +307,72 @@ export function QuestionEditPanel({
             <Radio value="PRIVATE">Không hiện</Radio>
           </div>
         </Radio.Group>
+      </div>
+
+      <Divider style={{ margin: 0 }} />
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          opacity: hasChanges ? 1 : 0.5,
+          pointerEvents: hasChanges ? 'auto' : 'none',
+        }}
+      >
+        <Text strong>Áp dụng thiết lập trên cho</Text>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <Checkbox
+            checked={applyToAll}
+            onChange={(e) => {
+              setApplyToAllLocal(e.target.checked);
+              if (e.target.checked) setTargetIds([]);
+            }}
+          >
+            Tất cả câu hỏi
+          </Checkbox>
+          <Select
+            mode="multiple"
+            placeholder="Chọn câu hỏi"
+            style={{ width: '100%' }}
+            disabled={applyToAll}
+            value={targetIds}
+            onChange={setTargetIds}
+            options={questions
+              .filter((q) => q.id !== questionId)
+              .map((q) => ({
+                label: `Câu ${q.order}: ${q.prompt || '(Trống)'}`,
+                value: q.id,
+              }))}
+          />
+          <Button
+            type="primary"
+            disabled={!applyToAll && targetIds.length === 0}
+            loading={applying}
+            onClick={async () => {
+              setApplying(true);
+              try {
+                const res = await apiFetch(`/api/questions/${questionId}/apply-settings-to-others`, {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    applyToAll,
+                    targetQuestionIds: targetIds,
+                  }),
+                });
+                if (res.ok) {
+                  message.success('Đã áp dụng config cho các câu hỏi khác');
+                  setHasChanges(false);
+                } else {
+                  message.error('Áp dụng config thất bại');
+                }
+              } finally {
+                setApplying(false);
+              }
+            }}
+          >
+            Áp dụng
+          </Button>
+        </div>
       </div>
     </div>
   );

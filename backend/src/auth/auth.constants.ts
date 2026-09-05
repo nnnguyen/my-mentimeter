@@ -1,3 +1,5 @@
+import { CookieOptions } from 'express';
+
 export const ACCESS_TOKEN_COOKIE = 'access_token';
 
 // Should stay in sync with JWT_EXPIRES_IN in .env (default "7d").
@@ -10,7 +12,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // browsers for None) to be sent on cross-origin fetch() calls. In dev,
 // localhost:3000 -> localhost:3001 is same-site, so Lax works and avoids
 // needing HTTPS locally.
-export const ACCESS_TOKEN_COOKIE_OPTIONS = {
+export const ACCESS_TOKEN_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: isProduction,
   sameSite: isProduction ? 'none' : 'lax',
