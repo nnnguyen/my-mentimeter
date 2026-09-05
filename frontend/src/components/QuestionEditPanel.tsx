@@ -227,8 +227,15 @@ export function QuestionEditPanel({
                 }
                 if (info.file.status === 'done') {
                   setUploading(false);
-                  const url = info.file.response.url;
-                  change({ logoUrl: url });
+                  const url = info.file.response?.url;
+                  if (url) {
+                    change({ logoUrl: url });
+                  } else {
+                    message.error('Không tìm thấy URL ảnh trong phản hồi');
+                  }
+                } else if (info.file.status === 'error') {
+                  setUploading(false);
+                  message.error('Tải lên logo thất bại');
                 }
               }}
             >
