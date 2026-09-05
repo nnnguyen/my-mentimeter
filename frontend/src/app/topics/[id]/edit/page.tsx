@@ -9,7 +9,7 @@ import {
   QrcodeOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
-import { apiFetch } from '@/lib/api';
+import { API_BASE_URL, apiFetch } from '@/lib/api';
 import { createAutosaveController } from '@/lib/autosave';
 import { getContrastColor, getContrastingPalette } from '@/lib/text-color-schemes';
 import { WordCloud, type WordCloudWord } from '@/components/WordCloud';
@@ -472,7 +472,7 @@ export default function TopicEditPage() {
                 >
                   {selectedQuestion.logoUrl ? (
                     <img
-                      src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${selectedQuestion.logoUrl}`}
+                      src={`${API_BASE_URL}${selectedQuestion.logoUrl}`}
                       alt="Logo"
                       style={{ maxHeight: 60, maxWidth: 160, objectFit: 'contain', display: 'block' }}
                     />

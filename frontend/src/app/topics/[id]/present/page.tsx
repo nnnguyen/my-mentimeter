@@ -405,7 +405,7 @@ export default function TopicPresentPage() {
             }}
           >
             <img
-              src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${currentQuestion.logoUrl}`}
+              src={`${API_BASE_URL}${currentQuestion.logoUrl}`}
               alt="Logo"
               style={{ maxHeight: 100, maxWidth: 240, objectFit: 'contain', display: 'block' }}
             />

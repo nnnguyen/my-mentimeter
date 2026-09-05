@@ -16,7 +16,7 @@ import {
   Upload,
   message,
 } from 'antd';
-import { apiFetch } from '@/lib/api';
+import { API_BASE_URL, API_URL, apiFetch } from '@/lib/api';
 import { CloseOutlined, LoadingOutlined, PlusOutlined } from '@ant-design/icons';
 import { TEXT_COLOR_SCHEME_OPTIONS } from '@/lib/text-color-schemes';
 import {
@@ -211,7 +211,7 @@ export function QuestionEditPanel({
               listType="picture-card"
               className="avatar-uploader"
               showUploadList={false}
-              action={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/questions/upload-logo`}
+              action={`${API_URL}/questions/upload-logo`}
               withCredentials={true}
               beforeUpload={(file) => {
                 const isLt2M = file.size / 1024 / 1024 < 2;
@@ -241,7 +241,7 @@ export function QuestionEditPanel({
             >
               {question.logoUrl ? (
                 <img
-                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${question.logoUrl}`}
+                  src={`${API_BASE_URL}${question.logoUrl}`}
                   alt="logo"
                   style={{ width: '100%' }}
                 />
