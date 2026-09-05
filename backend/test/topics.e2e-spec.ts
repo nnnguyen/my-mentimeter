@@ -44,20 +44,22 @@ describe('Topics (e2e)', () => {
     prisma = app.get(PrismaService);
     jwtService = app.get(JwtService);
 
-    userA = await prisma.user.create({
+    userA = (await prisma.user.create({
       data: {
         googleId: 'e2e-topics-user-a',
         email: 'e2e-topics-a@example.com',
         name: 'User A',
+        isEmailVerified: true,
       },
-    });
-    userB = await prisma.user.create({
+    })) as { id: string; email: string; name: string };
+    userB = (await prisma.user.create({
       data: {
         googleId: 'e2e-topics-user-b',
         email: 'e2e-topics-b@example.com',
         name: 'User B',
+        isEmailVerified: true,
       },
-    });
+    })) as { id: string; email: string; name: string };
     cookieA = cookieFor(userA);
     cookieB = cookieFor(userB);
   });

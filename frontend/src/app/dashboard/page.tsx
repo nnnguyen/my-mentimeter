@@ -73,44 +73,47 @@ export default function DashboardPage() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   const loadTopics = useCallback(async () => {
-    const res = await apiFetch('/api/topics');
-    if (res.ok) setTopics(await res.json());
+    try {
+      const data = await apiFetch('/topics');
+      setTopics(data);
+    } catch (error) {
+      console.error('Load topics failed:', error);
+    }
   }, []);
 
   useEffect(() => {
-    apiFetch('/api/auth/session')
-      .then((res) => {
-        if (!res.ok) {
-          router.push('/login');
-          return null;
-        }
-        return res.json();
-      })
-      .then(async (data) => {
+    apiFetch('/auth/session')
+      .then((data) => {
         if (data) {
           setUser(data);
-          await loadTopics();
+          loadTopics();
         }
+      })
+      .catch(() => {
+        router.push('/login');
       })
       .finally(() => setLoading(false));
   }, [router, loadTopics]);
 
   const handleLogout = async () => {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
     router.push('/login');
   };
 
   const handleCreate = async (values: { title: string; description?: string }) => {
     setCreating(true);
     try {
-      const res = await apiFetch('/api/topics', { method: 'POST', body: JSON.stringify(values) });
-      if (!res.ok) throw new Error('create failed');
-      const { id } = await res.json();
+      const data = await apiFetch('/topics', { method: 'POST', body: JSON.stringify(values) });
+      const { id } = data;
       message.success('Tạo topic thành công');
       setModalOpen(false);
       form.resetFields();
       router.push(`/topics/${id}/edit`);
-    } catch {
+    } catch (error) {
       message.error('Tạo topic thất bại');
     } finally {
       setCreating(false);
@@ -126,16 +129,14 @@ export default function DashboardPage() {
     if (!editingTopic) return;
     setSavingEdit(true);
     try {
-      const res = await apiFetch(`/api/topics/${editingTopic.id}`, {
+      const updated = await apiFetch(`/topics/${editingTopic.id}`, {
         method: 'PATCH',
         body: JSON.stringify(values),
       });
-      if (!res.ok) throw new Error('update failed');
-      const updated: Topic = await res.json();
       setTopics((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       message.success('Đã cập nhật topic');
       setEditingTopic(null);
-    } catch {
+    } catch (error) {
       message.error('Cập nhật thất bại');
     } finally {
       setSavingEdit(false);
@@ -146,15 +147,13 @@ export default function DashboardPage() {
     const nextStatus = topic.status === 'ACTIVE' ? 'CLOSED' : 'ACTIVE';
     setUpdatingStatusId(topic.id);
     try {
-      const res = await apiFetch(`/api/topics/${topic.id}`, {
+      const updated = await apiFetch(`/topics/${topic.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: nextStatus }),
       });
-      if (!res.ok) throw new Error('update failed');
-      const updated: Topic = await res.json();
       setTopics((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       message.success(nextStatus === 'ACTIVE' ? 'Đã kích hoạt topic' : 'Đã khóa topic');
-    } catch {
+    } catch (error) {
       message.error('Cập nhật trạng thái thất bại');
     } finally {
       setUpdatingStatusId(null);
@@ -162,11 +161,11 @@ export default function DashboardPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const res = await apiFetch(`/api/topics/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      await apiFetch(`/topics/${id}`, { method: 'DELETE' });
       message.success('Đã xoá topic');
       await loadTopics();
-    } else {
+    } catch (error) {
       message.error('Xoá thất bại');
     }
   };
@@ -192,11 +191,15 @@ export default function DashboardPage() {
           justifyContent: 'space-between',
           background: '#fff',
           borderBottom: '1px solid #f0f0f0',
+          padding: '0 24px',
         }}
       >
-        <Title level={4} style={{ margin: 0 }}>
-          Mentimeter
-        </Title>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src="/logo.jpg" alt="Logo" style={{ width: 32, height: 32, borderRadius: 4 }} />
+          <Title level={4} style={{ margin: 0 }}>
+            SOH Word Cloud
+          </Title>
+        </div>
         <Space>
           <Avatar src={user.avatarUrl} size="small">
             {user.name?.[0]}

@@ -11,11 +11,18 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  googleId  String   @unique
-  email     String   @unique
-  name      String
+  id        String  @id @default(uuid())
+  googleId  String? @unique
+  email     String  @unique
+  password  String?
+  name      String?
   avatarUrl String?
+
+  isEmailVerified      Boolean   @default(false)
+  verificationToken    String?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+
   createdAt DateTime @default(now())
   topics    Topic[]
 }

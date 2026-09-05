@@ -12,10 +12,19 @@ export interface GoogleProfile {
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor() {
+    const clientID = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const callbackURL = process.env.GOOGLE_CALLBACK_URL;
+
+    if (!clientID || !clientSecret || !callbackURL || clientID.includes('placeholder')) {
+      // In development, we might not have these yet, but let's log it
+      console.warn('Google OAuth credentials are not properly configured.');
+    }
+
     super({
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL,
+      clientID: clientID || 'dummy-id',
+      clientSecret: clientSecret || 'dummy-secret',
+      callbackURL: callbackURL || 'http://localhost:3001/api/auth/google/callback',
       scope: ['email', 'profile'],
     } as StrategyOptions);
   }

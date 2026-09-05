@@ -82,11 +82,10 @@ export default function TopicEditPage() {
   const questionsAutosaveRef = useRef(
     createAutosaveController<QuestionPatch>({
       save: async (questionId, patch) => {
-        const res = await apiFetch(`/api/questions/${questionId}`, {
+        await apiFetch(`/questions/${questionId}`, {
           method: 'PATCH',
           body: JSON.stringify(patch),
         });
-        if (!res.ok) throw new Error('save failed');
       },
       onSaving: () => setSaveStatus({ status: 'saving', lastSavedAt: null }),
       onSaved: () => setSaveStatus({ status: 'saved', lastSavedAt: new Date() }),
@@ -98,11 +97,10 @@ export default function TopicEditPage() {
   const topicAutosaveRef = useRef(
     createAutosaveController<TopicPatch>({
       save: async (topicId, patch) => {
-        const res = await apiFetch(`/api/topics/${topicId}`, {
+        await apiFetch(`/topics/${topicId}`, {
           method: 'PATCH',
           body: JSON.stringify(patch),
         });
-        if (!res.ok) throw new Error('save failed');
       },
       onError: () => message.error('Lưu topic thất bại, thử lại sau'),
     }),
@@ -110,44 +108,49 @@ export default function TopicEditPage() {
   const topicAutosave = topicAutosaveRef.current;
 
   const loadQuestions = useCallback(async (topicId: string): Promise<Question[]> => {
-    const res = await apiFetch(`/api/topics/${topicId}/questions`);
-    if (!res.ok) return [];
-    const data: Question[] = await res.json();
-    setQuestions(data);
+    try {
+      const data: Question[] = await apiFetch(`/topics/${topicId}/questions`);
+      setQuestions(data);
 
-    // Fetch stats for each question to show real word cloud in preview
-    data.forEach(async (q) => {
-      const statsRes = await apiFetch(`/api/questions/${q.id}/wordcloud`);
-      if (statsRes.ok) {
-        const stats = await statsRes.json();
-        setRealtimeStats((prev) => ({ ...prev, [q.id]: stats }));
-      }
-    });
+      // Fetch stats for each question to show real word cloud in preview
+      data.forEach(async (q) => {
+        try {
+          const stats = await apiFetch(`/questions/${q.id}/wordcloud`);
+          setRealtimeStats((prev) => ({ ...prev, [q.id]: stats }));
+        } catch (error) {
+          console.error('Fetch stats failed:', error);
+        }
+      });
 
-    return data;
+      return data;
+    } catch (error) {
+      console.error('Load questions failed:', error);
+      return [];
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await apiFetch(`/api/topics/${id}`);
-      if (res.status === 401) {
-        router.push('/login');
-        return;
+      try {
+        const topicData: Topic = await apiFetch(`/topics/${id}`);
+        if (cancelled) return;
+        setTopic(topicData);
+        const qs = await loadQuestions(topicData.id);
+        if (cancelled) return;
+        if (qs.length > 0) setSelectedQuestionId(qs[0].id);
+        setLoading(false);
+      } catch (error: any) {
+        if (error.message.includes('401')) {
+          router.push('/login');
+          return;
+        }
+        if (error.message.includes('403') || error.message.includes('404')) {
+          message.error('Bạn không có quyền truy cập topic này');
+          router.push('/dashboard');
+          return;
+        }
       }
-      if (res.status === 403 || res.status === 404) {
-        message.error('Bạn không có quyền truy cập topic này');
-        router.push('/dashboard');
-        return;
-      }
-      if (!res.ok) return;
-      const topicData: Topic = await res.json();
-      if (cancelled) return;
-      setTopic(topicData);
-      const qs = await loadQuestions(topicData.id);
-      if (cancelled) return;
-      if (qs.length > 0) setSelectedQuestionId(qs[0].id);
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -159,14 +162,20 @@ export default function TopicEditPage() {
   useEffect(() => {
     if (!topic) return;
     let objectUrl: string | null = null;
-    apiFetch(`/api/topics/${topic.id}/qrcode`)
-      .then((res) => (res.ok ? res.blob() : null))
+    apiFetch(`/topics/${topic.id}/qrcode`)
+      .then((res) => {
+        // Since apiFetch currently handles only JSON, let's keep it simple for now
+        // or ensure it returns the response if not JSON.
+        // Actually, our apiFetch handles data || response.
+        return res instanceof Response ? res.blob() : null;
+      })
       .then((blob) => {
         if (blob) {
           objectUrl = URL.createObjectURL(blob);
           setQrUrl(objectUrl);
         }
-      });
+      })
+      .catch(console.error);
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
@@ -197,50 +206,48 @@ export default function TopicEditPage() {
 
   const handleAddQuestion = async () => {
     if (!topic) return;
-    const res = await apiFetch(`/api/topics/${topic.id}/questions`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-    if (!res.ok) {
+    try {
+      const created: Question = await apiFetch(`/topics/${topic.id}/questions`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      setQuestions((prev) => [...prev, created]);
+      setSelectedQuestionId(created.id);
+      setPanelOpen(true);
+    } catch (error) {
       message.error('Tạo câu hỏi thất bại');
-      return;
     }
-    const created: Question = await res.json();
-    setQuestions((prev) => [...prev, created]);
-    setSelectedQuestionId(created.id);
-    setPanelOpen(true);
   };
 
   const handleDuplicateQuestion = async (questionId: string) => {
-    const res = await apiFetch(`/api/questions/${questionId}/duplicate`, { method: 'POST' });
-    if (!res.ok) {
+    try {
+      const created: Question = await apiFetch(`/questions/${questionId}/duplicate`, { method: 'POST' });
+      setQuestions((prev) => [...prev, created]);
+      setSelectedQuestionId(created.id);
+    } catch (error) {
       message.error('Nhân bản câu hỏi thất bại');
-      return;
     }
-    const created: Question = await res.json();
-    setQuestions((prev) => [...prev, created]);
-    setSelectedQuestionId(created.id);
   };
 
   const handleDeleteQuestion = async (questionId: string) => {
     if (!topic) return;
     const deletedOrder = questions.find((q) => q.id === questionId)?.order ?? 0;
-    const res = await apiFetch(`/api/questions/${questionId}`, { method: 'DELETE' });
-    if (!res.ok) {
-      message.error('Xoá câu hỏi thất bại');
-      return;
-    }
-    message.success('Đã xoá câu hỏi');
-    const remaining = await loadQuestions(topic.id);
-    if (selectedQuestionId === questionId) {
-      if (remaining.length === 0) {
-        setSelectedQuestionId(null);
-      } else {
-        const neighbor = remaining.reduce((closest, q) =>
-          Math.abs(q.order - deletedOrder) < Math.abs(closest.order - deletedOrder) ? q : closest,
-        );
-        setSelectedQuestionId(neighbor.id);
+    try {
+      await apiFetch(`/questions/${questionId}`, { method: 'DELETE' });
+      message.success('Đã xoá câu hỏi');
+      const remaining = await loadQuestions(topic.id);
+      if (selectedQuestionId === questionId) {
+        if (remaining.length === 0) {
+          setSelectedQuestionId(null);
+        } else {
+          const neighbor = remaining.reduce((closest, q) =>
+            Math.abs(q.order - deletedOrder) < Math.abs(closest.order - deletedOrder) ? q : closest,
+          );
+          setSelectedQuestionId(neighbor.id);
+        }
       }
+    } catch (error) {
+      message.error('Xoá câu hỏi thất bại');
     }
   };
 
@@ -252,33 +259,31 @@ export default function TopicEditPage() {
       .filter((q): q is Question => Boolean(q));
     setQuestions(reordered);
 
-    const res = await apiFetch(`/api/topics/${topic.id}/questions/reorder`, {
-      method: 'PATCH',
-      body: JSON.stringify({ orderedIds }),
-    });
-    if (!res.ok) {
+    try {
+      const updated: Question[] = await apiFetch(`/topics/${topic.id}/questions/reorder`, {
+        method: 'PATCH',
+        body: JSON.stringify({ orderedIds }),
+      });
+      setQuestions(updated);
+    } catch (error) {
       setQuestions(snapshot);
       message.error('Sắp xếp lại thất bại');
-      return;
     }
-    const updated: Question[] = await res.json();
-    setQuestions(updated);
   };
 
   const handleApplyToAll = async (group: ApplyToAllGroup) => {
     if (!selectedQuestion || !topic) return;
     questionsAutosave.flush(selectedQuestion.id);
-    const res = await apiFetch(`/api/questions/${selectedQuestion.id}/apply-settings-to-all`, {
-      method: 'POST',
-      body: JSON.stringify({ groups: [group] }),
-    });
-    if (!res.ok) {
+    try {
+      const { updatedCount } = await apiFetch(`/questions/${selectedQuestion.id}/apply-settings-to-all`, {
+        method: 'POST',
+        body: JSON.stringify({ groups: [group] }),
+      });
+      await loadQuestions(topic.id);
+      message.success(`Đã áp dụng cho ${updatedCount} câu hỏi`);
+    } catch (error) {
       message.error('Áp dụng thất bại');
-      return;
     }
-    const { updatedCount } = await res.json();
-    await loadQuestions(topic.id);
-    message.success(`Đã áp dụng cho ${updatedCount} câu hỏi`);
   };
 
   const handleTopicTitleChange = (title: string) => {

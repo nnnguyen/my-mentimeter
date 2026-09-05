@@ -75,12 +75,22 @@ describe('WordCloudGateway (e2e)', () => {
     prisma = app.get(PrismaService);
     jwtService = app.get(JwtService);
 
-    owner = await prisma.user.create({
-      data: { googleId: 'e2e-wc-owner', email: 'e2e-wc-owner@example.com', name: 'Owner' },
-    });
-    intruder = await prisma.user.create({
-      data: { googleId: 'e2e-wc-intruder', email: 'e2e-wc-intruder@example.com', name: 'Intruder' },
-    });
+    owner = (await prisma.user.create({
+      data: {
+        googleId: 'e2e-wc-owner',
+        email: 'e2e-wc-owner@example.com',
+        name: 'Owner',
+        isEmailVerified: true,
+      },
+    })) as { id: string; email: string; name: string };
+    intruder = (await prisma.user.create({
+      data: {
+        googleId: 'e2e-wc-intruder',
+        email: 'e2e-wc-intruder@example.com',
+        name: 'Intruder',
+        isEmailVerified: true,
+      },
+    })) as { id: string; email: string; name: string };
     topic = await prisma.topic.create({
       data: { ownerId: owner.id, title: 'Realtime topic', code: 'WCE001', status: 'ACTIVE' },
     });

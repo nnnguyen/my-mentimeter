@@ -56,18 +56,18 @@ export default function JoinPage() {
 
   const fetchTopicRef = useRef<() => Promise<void>>();
   fetchTopicRef.current = async () => {
-    const participantSessionId = getParticipantSessionId();
-    const res = await apiFetch(
-      `/api/public/topics/${code}?participantSessionId=${participantSessionId}`,
-    );
-    if (res.status === 404) {
-      setNotFound(true);
-      return;
+    try {
+      const participantSessionId = getParticipantSessionId();
+      const data = await apiFetch(
+        `/public/topics/${code}?participantSessionId=${participantSessionId}`,
+      );
+      setTopic(data);
+      setSubmittedCount(data.currentQuestion?.myResponseCount ?? 0);
+    } catch (error: any) {
+      if (error.message.includes('404')) {
+        setNotFound(true);
+      }
     }
-    if (!res.ok) return;
-    const data: PublicTopic = await res.json();
-    setTopic(data);
-    setSubmittedCount(data.currentQuestion?.myResponseCount ?? 0);
   };
 
   useEffect(() => {
@@ -152,23 +152,16 @@ export default function JoinPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await apiFetch(`/api/public/questions/${question.id}/responses`, {
+      const data = await apiFetch(`/public/questions/${question.id}/responses`, {
         method: 'POST',
         body: JSON.stringify({ text, participantSessionId: getParticipantSessionId() }),
       });
-      const data = await res.json();
 
-      if (res.status === 201) {
-        setSubmittedCount((data as { submittedCount: number }).submittedCount);
-        setText('');
-      } else {
-        setError((data as { message?: string }).message ?? 'Có lỗi xảy ra, vui lòng thử lại.');
-        if (res.status === 429 && question.config.responseLimit !== null) {
-          setSubmittedCount(question.config.responseLimit);
-        }
-      }
-    } catch {
-      setError('Có lỗi xảy ra, vui lòng thử lại.');
+      setSubmittedCount(data.submittedCount);
+      setText('');
+    } catch (error: any) {
+      setError(error.message || 'Có lỗi xảy ra, vui lòng thử lại.');
+      // Logic for 429 could be added here if needed, but apiFetch throws
     } finally {
       setSubmitting(false);
     }

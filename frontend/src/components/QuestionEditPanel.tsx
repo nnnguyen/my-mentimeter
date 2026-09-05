@@ -359,19 +359,17 @@ export function QuestionEditPanel({
             onClick={async () => {
               setApplying(true);
               try {
-                const res = await apiFetch(`/api/questions/${questionId}/apply-settings-to-others`, {
+                await apiFetch(`/questions/${questionId}/apply-settings-to-others`, {
                   method: 'POST',
                   body: JSON.stringify({
                     applyToAll,
                     targetQuestionIds: targetIds,
                   }),
                 });
-                if (res.ok) {
-                  message.success('Đã áp dụng config cho các câu hỏi khác');
-                  setHasChanges(false);
-                } else {
-                  message.error('Áp dụng config thất bại');
-                }
+                message.success('Đã áp dụng config cho các câu hỏi khác');
+                setHasChanges(false);
+              } catch (error) {
+                message.error('Áp dụng config thất bại');
               } finally {
                 setApplying(false);
               }

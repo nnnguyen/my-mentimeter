@@ -93,22 +93,29 @@ export default function TopicPresentPage() {
   const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   const loadTopic = useCallback(async () => {
-    const res = await apiFetch(`/api/topics/${id}`);
-    if (res.status === 401) {
-      router.push('/login');
-      return;
+    try {
+      const data = await apiFetch(`/topics/${id}`);
+      setTopic(data);
+    } catch (error: any) {
+      if (error.message.includes('401')) {
+        router.push('/login');
+        return;
+      }
+      if (error.message.includes('403') || error.message.includes('404')) {
+        message.error('Bạn không có quyền truy cập topic này');
+        router.push('/dashboard');
+        return;
+      }
     }
-    if (res.status === 403 || res.status === 404) {
-      message.error('Bạn không có quyền truy cập topic này');
-      router.push('/dashboard');
-      return;
-    }
-    if (res.ok) setTopic(await res.json());
   }, [id, router]);
 
   const loadQuestions = useCallback(async (topicId: string) => {
-    const res = await apiFetch(`/api/topics/${topicId}/questions`);
-    if (res.ok) setQuestions(await res.json());
+    try {
+      const data = await apiFetch(`/topics/${topicId}/questions`);
+      setQuestions(data);
+    } catch (error) {
+      console.error('Load questions failed:', error);
+    }
   }, []);
 
   useEffect(() => {
@@ -144,14 +151,15 @@ export default function TopicPresentPage() {
   useEffect(() => {
     if (!topic) return;
     let objectUrl: string | null = null;
-    apiFetch(`/api/topics/${topic.id}/qrcode`)
-      .then((res) => (res.ok ? res.blob() : null))
+    apiFetch(`/topics/${topic.id}/qrcode`)
+      .then((res) => (res instanceof Response ? res.blob() : null))
       .then((blob) => {
         if (blob) {
           objectUrl = URL.createObjectURL(blob);
           setQrUrl(objectUrl);
         }
-      });
+      })
+      .catch(console.error);
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
@@ -175,9 +183,13 @@ export default function TopicPresentPage() {
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     const fetchSnapshot = async () => {
-      const res = await apiFetch(`/api/questions/${questionId}/wordcloud`);
-      if (!cancelled && res.ok) {
-        setWordCloud(await res.json());
+      try {
+        const data = await apiFetch(`/questions/${questionId}/wordcloud`);
+        if (!cancelled) {
+          setWordCloud(data);
+        }
+      } catch (error) {
+        console.error('Fetch snapshot failed:', error);
       }
     };
 
@@ -264,12 +276,13 @@ export default function TopicPresentPage() {
     if (!topic || !target) return;
     setChangingQuestion(true);
     try {
-      const res = await apiFetch(`/api/topics/${topic.id}/current-question`, {
+      const data = await apiFetch(`/topics/${topic.id}/current-question`, {
         method: 'POST',
         body: JSON.stringify({ questionId: target.id }),
       });
-      if (res.ok) setTopic(await res.json());
-      else message.error('Chuyển câu hỏi thất bại');
+      setTopic(data);
+    } catch (error) {
+      message.error('Chuyển câu hỏi thất bại');
     } finally {
       setChangingQuestion(false);
     }
@@ -289,15 +302,12 @@ export default function TopicPresentPage() {
     if (!currentQuestion) return;
     setRevealing(true);
     try {
-      const res = await apiFetch(`/api/questions/${currentQuestion.id}/reveal-results`, {
+      const updated: Question = await apiFetch(`/questions/${currentQuestion.id}/reveal-results`, {
         method: 'POST',
       });
-      if (res.ok) {
-        const updated: Question = await res.json();
-        setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
-      } else {
-        message.error('Hiện kết quả thất bại');
-      }
+      setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+    } catch (error) {
+      message.error('Hiện kết quả thất bại');
     } finally {
       setRevealing(false);
     }
