@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { Button, Card, Typography, Form, Input, Checkbox, message, Divider } from 'antd';
 import { GoogleOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
 import { API_BASE_URL, API_URL, apiFetch } from '@/lib/api';
@@ -11,12 +11,8 @@ import { useEffect } from 'react';
 
 const { Title, Paragraph, Text } = Typography;
 
-export default function LoginPage() {
-  const router = useRouter();
+function LoginErrorHandler({ router }: { router: ReturnType<typeof useRouter> }) {
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(false);
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [isForgotOpen, setIsForgotOpen] = useState(false);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -30,6 +26,15 @@ export default function LoginPage() {
       router.replace('/login');
     }
   }, [searchParams, router]);
+
+  return null;
+}
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
 
   const handleGoogleLogin = () => {
     window.location.href = `${API_URL}/auth/google`;
@@ -66,6 +71,9 @@ export default function LoginPage() {
         backgroundColor: '#f5f5f5'
       }}
     >
+      <Suspense fallback={null}>
+        <LoginErrorHandler router={router} />
+      </Suspense>
       <Card style={{ width: 400, borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <img src="/logo.jpg" alt="Logo" style={{ width: 80, height: 80, marginBottom: 16, borderRadius: 8 }} />
