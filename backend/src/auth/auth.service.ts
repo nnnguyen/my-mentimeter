@@ -17,15 +17,41 @@ export class AuthService {
   ) {}
 
   async validateOAuthUser(profile: GoogleProfile): Promise<User> {
-    return this.prisma.user.upsert({
+    const byGoogleId = await this.prisma.user.findUnique({
       where: { googleId: profile.googleId },
-      update: {
-        email: profile.email,
-        name: profile.name,
-        avatarUrl: profile.avatarUrl,
-        isEmailVerified: true, // OAuth is verified
-      },
-      create: {
+    });
+    if (byGoogleId) {
+      return this.prisma.user.update({
+        where: { id: byGoogleId.id },
+        data: {
+          email: profile.email,
+          name: profile.name,
+          avatarUrl: profile.avatarUrl,
+          isEmailVerified: true, // OAuth is verified
+        },
+      });
+    }
+
+    // Account may already exist from email/password registration with the
+    // same email — link the Google identity to it instead of colliding on
+    // the unique `email` constraint.
+    const byEmail = await this.prisma.user.findUnique({
+      where: { email: profile.email },
+    });
+    if (byEmail) {
+      return this.prisma.user.update({
+        where: { id: byEmail.id },
+        data: {
+          googleId: profile.googleId,
+          name: byEmail.name ?? profile.name,
+          avatarUrl: byEmail.avatarUrl ?? profile.avatarUrl,
+          isEmailVerified: true,
+        },
+      });
+    }
+
+    return this.prisma.user.create({
+      data: {
         googleId: profile.googleId,
         email: profile.email,
         name: profile.name,
