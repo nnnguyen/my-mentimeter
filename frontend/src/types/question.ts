@@ -16,6 +16,7 @@ export interface Question {
   questionColor: string | null;
   textColorScheme: string;
   showLogo: boolean;
+  logoUrl: string | null;
   maxWordsDisplayed: number;
   showJoiningInfo: boolean;
   joiningInfoType: JoiningInfoType;
@@ -37,6 +38,7 @@ export type QuestionPatch = Partial<
     | 'questionColor'
     | 'textColorScheme'
     | 'showLogo'
+    | 'logoUrl'
     | 'maxWordsDisplayed'
     | 'showJoiningInfo'
     | 'joiningInfoType'

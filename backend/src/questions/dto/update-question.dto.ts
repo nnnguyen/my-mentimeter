@@ -63,6 +63,10 @@ export class UpdateQuestionDto {
   showLogo?: boolean;
 
   @IsOptional()
+  @IsString()
+  logoUrl?: string | null;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(200)

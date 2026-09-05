@@ -437,6 +437,9 @@ export default function TopicEditPage() {
           ) : (
             <div
               style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
                 width: '100%',
                 maxWidth: 640,
                 backgroundColor: selectedQuestion.backgroundColor,
@@ -451,18 +454,38 @@ export default function TopicEditPage() {
               {selectedQuestion.showLogo && (
                 <div
                   style={{
-                    position: 'absolute',
-                    top: 16,
-                    right: 16,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: secondaryTextColor || '#8c8c8c',
-                    border: `1px solid ${secondaryTextColor || '#d9d9d9'}`,
-                    borderRadius: 4,
-                    padding: '2px 8px',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                    padding: 6,
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: 8,
+                    boxShadow: `0 2px 8px ${
+                      questionTextColor === '#FFFFFF' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.1)'
+                    }`,
+                    border: `1px solid ${questionTextColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}`,
+                    backdropFilter: 'blur(4px)',
+                    alignSelf: 'center',
                   }}
                 >
-                  Logo
+                  {selectedQuestion.logoUrl ? (
+                    <img
+                      src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${selectedQuestion.logoUrl}`}
+                      alt="Logo"
+                      style={{ maxHeight: 60, maxWidth: 160, objectFit: 'contain', display: 'block' }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: secondaryTextColor || '#8c8c8c',
+                        padding: '2px 8px',
+                      }}
+                    >
+                      Logo
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -472,12 +495,12 @@ export default function TopicEditPage() {
                   onChange: (value) => handleFieldChange(selectedQuestion.id, { prompt: value }),
                   triggerType: ['text'],
                 }}
-                style={{ marginTop: 8, color: 'inherit' }}
+                style={{ marginTop: 8, color: 'inherit', textAlign: 'center' }}
               >
                 {selectedQuestion.prompt || 'Nhập câu hỏi Word Cloud của bạn'}
               </Title>
 
-              <div style={{ marginTop: 24 }}>
+              <div style={{ marginTop: 24, width: '100%' }}>
                 <WordCloud words={previewWords} colors={previewColors} />
               </div>
 

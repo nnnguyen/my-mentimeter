@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Button,
   ColorPicker,
@@ -11,8 +12,10 @@ import {
   Tag,
   Tooltip,
   Typography,
+  Upload,
+  message,
 } from 'antd';
-import { CloseOutlined } from '@ant-design/icons';
+import { CloseOutlined, LoadingOutlined, PlusOutlined } from '@ant-design/icons';
 import { TEXT_COLOR_SCHEME_OPTIONS } from '@/lib/text-color-schemes';
 import {
   DEFAULT_BACKGROUND_COLOR,
@@ -71,6 +74,7 @@ export function QuestionEditPanel({
   onApplyToAll,
   onClose,
 }: QuestionEditPanelProps) {
+  const [uploading, setUploading] = useState(false);
   const questionId = question.id;
   const change = (patch: QuestionPatch) => onFieldChange(questionId, patch);
 
@@ -184,6 +188,49 @@ export function QuestionEditPanel({
         <Row label="Hiện logo">
           <Switch checked={question.showLogo} onChange={(checked) => change({ showLogo: checked })} />
         </Row>
+        {question.showLogo && (
+          <Row label="Logo">
+            <Upload
+              name="file"
+              listType="picture-card"
+              className="avatar-uploader"
+              showUploadList={false}
+              action={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/questions/upload-logo`}
+              withCredentials={true}
+              beforeUpload={(file) => {
+                const isLt2M = file.size / 1024 / 1024 < 2;
+                if (!isLt2M) {
+                  message.error('Ảnh phải nhỏ hơn 2MB!');
+                }
+                return isLt2M;
+              }}
+              onChange={(info) => {
+                if (info.file.status === 'uploading') {
+                  setUploading(true);
+                  return;
+                }
+                if (info.file.status === 'done') {
+                  setUploading(false);
+                  const url = info.file.response.url;
+                  change({ logoUrl: url });
+                }
+              }}
+            >
+              {question.logoUrl ? (
+                <img
+                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${question.logoUrl}`}
+                  alt="logo"
+                  style={{ width: '100%' }}
+                />
+              ) : (
+                <div>
+                  {uploading ? <LoadingOutlined /> : <PlusOutlined />}
+                  <div style={{ marginTop: 8 }}>Tải lên</div>
+                </div>
+              )}
+            </Upload>
+          </Row>
+        )}
         <Row label="Số từ hiển thị tối đa">
           <InputNumber
             min={1}

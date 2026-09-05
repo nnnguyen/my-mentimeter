@@ -367,13 +367,42 @@ export default function TopicPresentPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: 16,
+          padding: '16px 24px',
           flexShrink: 0,
+          position: 'relative',
+          minHeight: 120, // Tăng chiều cao tối thiểu để logo không đè content top bar
         }}
       >
         <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`/topics/${topic.id}/edit`)}>
           Quay lại
         </Button>
+
+        {/* Logo */}
+        {currentQuestion?.showLogo && currentQuestion.logoUrl && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 10,
+              padding: 8,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              borderRadius: 8,
+              boxShadow: `0 4px 12px ${
+                questionTextColor === '#FFFFFF' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'
+              }`,
+              border: `1px solid ${questionTextColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}`,
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${currentQuestion.logoUrl}`}
+              alt="Logo"
+              style={{ maxHeight: 100, maxWidth: 240, objectFit: 'contain', display: 'block' }}
+            />
+          </div>
+        )}
 
         <Space>
           <Tag color={CONNECTION_LABEL[connectionStatus].color}>
@@ -419,7 +448,7 @@ export default function TopicPresentPage() {
               disabled={!prevQuestion || changingQuestion}
               onClick={() => handleChangeQuestion(prevQuestion)}
             />
-            <div style={{ textAlign: 'center', maxWidth: '70%' }}>
+            <div style={{ textAlign: 'center', width: '100%', padding: '0 80px' }}>
               {currentQuestion && (
                 <>
                   <Title level={2} style={{ margin: 0, color: 'inherit' }}>

@@ -139,7 +139,9 @@ describe('TopicsService', () => {
           updateMany: jest.fn(),
           update: jest.fn().mockResolvedValue({ ...question, status: 'ACTIVE' }),
         },
-        topic: { update: jest.fn().mockResolvedValue({ ...topic, currentQuestionId: question.id }) },
+        topic: {
+          update: jest.fn().mockResolvedValue({ ...topic, currentQuestionId: question.id }),
+        },
       };
       prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) => cb(tx));
 
@@ -172,7 +174,9 @@ describe('TopicsService', () => {
           update: jest.fn().mockResolvedValue({ ...question, status: 'ACTIVE' }),
         },
         topic: {
-          update: jest.fn().mockResolvedValue({ ...topicWithCurrent, currentQuestionId: question.id }),
+          update: jest
+            .fn()
+            .mockResolvedValue({ ...topicWithCurrent, currentQuestionId: question.id }),
         },
       };
       prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) => cb(tx));

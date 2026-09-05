@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
@@ -10,6 +24,28 @@ import { ApplySettingsToAllDto } from './dto/apply-settings-to-all.dto';
 @UseGuards(JwtAuthGuard)
 export class QuestionsController {
   constructor(private readonly questionsService: QuestionsService) {}
+
+  @Post('upload-logo')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const randomName = Array(32)
+            .fill(null)
+            .map(() => Math.round(Math.random() * 16).toString(16))
+            .join('');
+          cb(null, `${randomName}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    }),
+  )
+  uploadLogo(@UploadedFile() file: Express.Multer.File) {
+    return {
+      url: `/uploads/${file.filename}`,
+    };
+  }
 
   @Get(':id')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
