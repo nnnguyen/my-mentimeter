@@ -22,7 +22,7 @@ interface PositionedWord extends CloudWord {
 
 const WIDTH = 1600;
 const HEIGHT = 800;
-const MIN_FONT_SIZE = 40;
+const MIN_FONT_SIZE = 28;
 const MAX_FONT_SIZE = 120;
 const MIN_FONT_WEIGHT = 400;
 const MAX_FONT_WEIGHT = 800;
@@ -43,7 +43,17 @@ function fontWeightFor(count: number): number {
   return count >= 2 ? 700 : 400;
 }
 
-export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloudWord[]; colors?: string[] }) {
+export function WordCloud({
+  words,
+  colors = DEFAULT_COLORS,
+  width = WIDTH,
+  height = HEIGHT,
+}: {
+  words: WordCloudWord[];
+  colors?: string[];
+  width?: number;
+  height?: number;
+}) {
   const [positioned, setPositioned] = useState<PositionedWord[]>([]);
   const seenWords = useRef<Set<string>>(new Set());
 
@@ -58,7 +68,7 @@ export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloud
     const maxCount = Math.max(...counts);
 
     const layout = cloud()
-      .size([WIDTH, HEIGHT])
+      .size([width, height])
       .words(
         words.map((w) => {
           const ratio = ratioFor(w.count, minCount, maxCount);
@@ -83,7 +93,7 @@ export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloud
     return () => {
       layout.stop();
     };
-  }, [words]);
+  }, [words, width, height]);
 
   useEffect(() => {
     positioned.forEach((w) => seenWords.current.add(w.text));
@@ -92,12 +102,13 @@ export function WordCloud({ words, colors = DEFAULT_COLORS }: { words: WordCloud
   return (
     <svg
       width="100%"
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+      height="100%"
+      viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label="Word cloud"
-      style={{ overflow: 'visible' }}
+      style={{ overflow: 'visible', display: 'block' }}
     >
-      <g transform={`translate(${WIDTH / 2},${HEIGHT / 2})`}>
+      <g transform={`translate(${width / 2},${height / 2})`}>
         <AnimatePresence>
           {positioned.map((w, i) => (
             <motion.text

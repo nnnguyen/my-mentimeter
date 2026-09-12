@@ -9,6 +9,8 @@ import {
   CloseOutlined,
   CopyOutlined,
   EyeOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
   LeftOutlined,
   QrcodeOutlined,
   RightOutlined,
@@ -91,6 +93,7 @@ export default function TopicPresentPage() {
   const [joinedCount, setJoinedCount] = useState(0);
   const [qrPanelOpen, setQrPanelOpen] = useState(false);
   const [statsModalOpen, setStatsModalOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const loadTopic = useCallback(async () => {
     try {
@@ -146,6 +149,7 @@ export default function TopicPresentPage() {
   useEffect(() => {
     setQrPanelOpen(false);
     setStatsModalOpen(false);
+    setIsFullscreen(false);
   }, [currentQuestion?.id]);
 
   useEffect(() => {
@@ -372,92 +376,94 @@ export default function TopicPresentPage() {
       }}
     >
       {/* Top bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '16px 24px',
-          flexShrink: 0,
-          position: 'relative',
-          minHeight: 120, // Tăng chiều cao tối thiểu để logo không đè content top bar
-        }}
-      >
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => router.push(`/topics/${topic.id}/edit`)}
+      {!isFullscreen && (
+        <div
           style={{
-            color: questionTextColor,
-            borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
-            backgroundColor: 'transparent',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 24px',
+            flexShrink: 0,
+            position: 'relative',
+            minHeight: 120, // Tăng chiều cao tối thiểu để logo không đè content top bar
           }}
         >
-          Quay lại
-        </Button>
-
-        {/* Logo */}
-        {currentQuestion?.showLogo && currentQuestion.logoUrl && (
-          <div
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => router.push(`/topics/${topic.id}/edit`)}
             style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 10,
-              padding: 8,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              borderRadius: 8,
-              boxShadow: `0 4px 12px ${
-                questionTextColor === '#FFFFFF' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'
-              }`,
-              border: `1px solid ${questionTextColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}`,
-              backdropFilter: 'blur(4px)',
+              color: questionTextColor,
+              borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+              backgroundColor: 'transparent',
             }}
           >
-            <img
-              src={`${API_BASE_URL}${currentQuestion.logoUrl}`}
-              alt="Logo"
-              style={{ maxHeight: 100, maxWidth: 240, objectFit: 'contain', display: 'block' }}
-            />
-          </div>
-        )}
+            Quay lại
+          </Button>
 
-        <Space>
-          <Tag color={CONNECTION_LABEL[connectionStatus].color}>
-            {CONNECTION_LABEL[connectionStatus].text}
-          </Tag>
-          {currentQuestion && (
-            <Button
-              icon={<BarChartOutlined />}
-              onClick={() => setStatsModalOpen(true)}
+          {/* Logo */}
+          {currentQuestion?.showLogo && currentQuestion.logoUrl && (
+            <div
               style={{
-                color: questionTextColor,
-                borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
-                backgroundColor: 'transparent',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 10,
+                padding: 8,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: 8,
+                boxShadow: `0 4px 12px ${
+                  questionTextColor === '#FFFFFF' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'
+                }`,
+                border: `1px solid ${questionTextColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}`,
+                backdropFilter: 'blur(4px)',
               }}
             >
-              Thống kê
-            </Button>
+              <img
+                src={`${API_BASE_URL}${currentQuestion.logoUrl}`}
+                alt="Logo"
+                style={{ maxHeight: 100, maxWidth: 240, objectFit: 'contain', display: 'block' }}
+              />
+            </div>
           )}
-          {currentQuestion?.showJoiningInfo && (
-            <Button
-              shape="circle"
-              type={qrPanelOpen ? 'primary' : 'default'}
-              icon={<QrcodeOutlined />}
-              onClick={() => setQrPanelOpen((v) => !v)}
-              style={
-                !qrPanelOpen
-                  ? {
-                      color: questionTextColor,
-                      borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
-                      backgroundColor: 'transparent',
-                    }
-                  : undefined
-              }
-            />
-          )}
-        </Space>
-      </div>
+
+          <Space>
+            <Tag color={CONNECTION_LABEL[connectionStatus].color}>
+              {CONNECTION_LABEL[connectionStatus].text}
+            </Tag>
+            {currentQuestion && (
+              <Button
+                icon={<BarChartOutlined />}
+                onClick={() => setStatsModalOpen(true)}
+                style={{
+                  color: questionTextColor,
+                  borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+                  backgroundColor: 'transparent',
+                }}
+              >
+                Thống kê
+              </Button>
+            )}
+            {currentQuestion?.showJoiningInfo && (
+              <Button
+                shape="circle"
+                type={qrPanelOpen ? 'primary' : 'default'}
+                icon={<QrcodeOutlined />}
+                onClick={() => setQrPanelOpen((v) => !v)}
+                style={
+                  !qrPanelOpen
+                    ? {
+                        color: questionTextColor,
+                        borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+                        backgroundColor: 'transparent',
+                      }
+                    : undefined
+                }
+              />
+            )}
+          </Space>
+        </div>
+      )}
 
       {/* Main content: question + nav + live word cloud */}
       {questions.length === 0 ? (
@@ -468,7 +474,7 @@ export default function TopicPresentPage() {
         <>
           <div
             style={{
-              display: 'flex',
+              display: isFullscreen ? 'none' : 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 24,
@@ -543,12 +549,39 @@ export default function TopicPresentPage() {
             style={{
               flex: 1,
               display: 'flex',
-              alignItems: 'center',
+              alignItems: previewWords.length > 50 ? 'flex-start' : 'center',
               justifyContent: 'center',
-              overflow: 'hidden',
-              padding: 24,
+              overflowY: 'auto',
+              padding: isFullscreen ? 0 : 24,
+              position: 'relative',
             }}
           >
+            {/* Fullscreen Button - Luôn hiển thị trừ khi bị ẩn (hidden) */}
+            {!hidden && (
+              <Button
+                icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                style={{
+                  position: 'fixed',
+                  bottom: 24,
+                  right: 24,
+                  zIndex: 1000,
+                  color: questionTextColor,
+                  borderColor: questionTextColor ? `${questionTextColor}80` : undefined,
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(8px)',
+                  width: 64,
+                  height: 64,
+                  fontSize: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                }}
+                title={isFullscreen ? 'Thu nhỏ' : 'Phóng to kết quả'}
+              />
+            )}
+
             {hidden ? (
               <Space orientation="vertical" align="center">
                 <Statistic
@@ -568,8 +601,20 @@ export default function TopicPresentPage() {
                 )}
               </Space>
             ) : previewWords.length > 0 ? (
-              <div style={{ width: '100%', maxWidth: 1600 }}>
-                <WordCloud words={previewWords} colors={previewColors} />
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: isFullscreen ? '100%' : 1600,
+                  position: 'relative',
+                  height: previewWords.length > 50 ? 1200 : 800,
+                  flexShrink: 0,
+                }}
+              >
+                <WordCloud
+                  words={previewWords}
+                  colors={previewColors}
+                  height={previewWords.length > 50 ? 1200 : 800}
+                />
               </div>
             ) : (
               <Text style={{ color: secondaryTextColor || 'rgba(0, 0, 0, 0.45)' }}>
