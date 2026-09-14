@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import type { Request } from 'express';
 
@@ -22,12 +23,21 @@ const MAX_REQUESTS_PER_WINDOW = Number(process.env.IP_RATE_LIMIT_MAX_PER_WINDOW)
 @Injectable()
 export class IpRateLimitGuard implements CanActivate {
   private readonly hits = new Map<string, { count: number; windowStart: number }>();
+  private readonly logger = new Logger(IpRateLimitGuard.name);
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     const ip = request.ip ?? 'unknown';
     const now = Date.now();
     const entry = this.hits.get(ip);
+
+    // TEMP DIAGNOSTIC — remove after investigating why the guard isn't
+    // throttling in production despite MAX_REQUESTS_PER_WINDOW=20.
+    this.logger.debug(
+      `DIAG ip=${ip} rawIp=${request.ip} xff=${request.headers['x-forwarded-for']} ` +
+        `MAX=${MAX_REQUESTS_PER_WINDOW} mapSize=${this.hits.size} ` +
+        `entry=${entry ? JSON.stringify(entry) : 'none'} guardInstance=${this.instanceId}`,
+    );
 
     if (!entry || now - entry.windowStart > WINDOW_MS) {
       this.hits.set(ip, { count: 1, windowStart: now });
@@ -43,4 +53,7 @@ export class IpRateLimitGuard implements CanActivate {
     }
     return true;
   }
+
+  // TEMP DIAGNOSTIC — identifies whether a new guard instance is created per request.
+  private readonly instanceId = Math.random().toString(36).slice(2, 8);
 }
