@@ -7,13 +7,17 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
-const WINDOW_MS = 60_000;
-const MAX_REQUESTS_PER_WINDOW = 20;
+const WINDOW_MS = Number(process.env.IP_RATE_LIMIT_WINDOW_MS) || 60_000;
+const MAX_REQUESTS_PER_WINDOW = Number(process.env.IP_RATE_LIMIT_MAX_PER_WINDOW) || 20;
 
 /**
  * Basic in-memory per-IP rate limiter for the public responses endpoint.
  * Single-process only (matches the "1 instance, no Redis yet" note in
  * CLAUDE.md mục 3) — would need a shared store if scaled to multiple instances.
+ *
+ * Limits are env-overridable (defaults unchanged: 20 req / 60s) so a load
+ * test can temporarily raise them via Railway env vars without a code
+ * change/redeploy to revert — just unset the vars to fall back to defaults.
  */
 @Injectable()
 export class IpRateLimitGuard implements CanActivate {
