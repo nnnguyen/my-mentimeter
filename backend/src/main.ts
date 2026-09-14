@@ -8,11 +8,15 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  // Behind Railway's (or any) reverse proxy, req.ip is the proxy's own
-  // address unless we trust the X-Forwarded-For header — without this the
-  // per-IP rate limiter (IpRateLimitGuard) would see every request as coming
-  // from the same IP and throttle all users combined, not per person.
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  // Railway's network puts TWO hops between the real client and this app —
+  // an edge layer and an internal router — each appending its own address to
+  // X-Forwarded-For. With `trust proxy: 1`, Express returned the internal
+  // router's address (which rotates across a pool per-connection) instead of
+  // the client's, so IpRateLimitGuard never saw the same "IP" twice and never
+  // throttled anyone. Confirmed via Railway HTTP/deploy logs: XFF arrived as
+  // "<real client ip>, <rotating internal ip>" — trust proxy: 2 is needed to
+  // walk back far enough to land on the real client IP.
+  app.getHttpAdapter().getInstance().set('trust proxy', 2);
 
   app.useStaticAssets(join(__dirname, '..', '..', 'uploads'), {
     prefix: '/uploads/',
